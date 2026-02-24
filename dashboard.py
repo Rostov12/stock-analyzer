@@ -93,7 +93,7 @@ if not history_df.empty and len(history_df) > 0:
     if len(valid_assets) > 0:
         selected_assets = st.multiselect("選擇要在圖表中顯示的資產", options=valid_assets, default=list(valid_assets)[:5]) # 預設只顯示前5個避免太雜
         
-        use_log = st.checkbox("使用對數座標 (幫助同時觀察比特幣與小幣/ETF 的價格波動)")
+        use_log = st.checkbox("使用對數座標 (有助於同時觀察比特幣與小幣/ETF 的價格波動)")
         
         if selected_assets:
             filtered_df = history_df[history_df['symbol'].isin(selected_assets)].copy()
@@ -103,26 +103,25 @@ if not history_df.empty and len(history_df) > 0:
             # 確保不會有 NaN 丟給前端，導致 JSON 轉換錯誤
             filtered_df = filtered_df.dropna(subset=['usd_price', 'timestamp'])
             
-            # 將時間強制轉為字串 ISO 格式，避免 DatetimeIndex 或 NaT 被丟到前端
-            filtered_df['timestamp'] = filtered_df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
-            
             if not filtered_df.empty:
                 try:
-                    # 繪製 Plotly 圖表
-                    fig = px.line(
-                        filtered_df,
-                        x="timestamp",
-                        y="usd_price",
-                        color="symbol",
-                        markers=True,
-                        title="資產價格變動趨勢",
-                        labels={"usd_price": "價格 (USD)", "timestamp": "時間"},
+                    import numpy as np
+                    
+                    # 轉換為 st.line_chart 所需的 DataFrame 格式 (Index=時間, Columns=商品, Values=價格)
+                    chart_data = filtered_df.pivot_table(
+                        index='timestamp',
+                        columns='symbol',
+                        values='usd_price',
+                        aggfunc='last'
                     )
                     
                     if use_log:
-                        fig.update_layout(yaxis_type="log")
-                        
-                    st.plotly_chart(fig, use_container_width=True)
+                        # 將數組轉為對數，過濾掉 0 或負數以策安全
+                        chart_data = chart_data.map(lambda x: np.log10(x) if x > 0 else np.nan)
+                        st.line_chart(chart_data)
+                        st.caption("※ 上述圖表已對數化 (Log10) 以方便跨級距商品比較。")
+                    else:
+                        st.line_chart(chart_data)
                 except Exception as e:
                     st.error(f"⚠️ 繪製圖表時發生錯誤：{e}")
             else:
