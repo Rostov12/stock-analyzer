@@ -87,28 +87,43 @@ st.header("📊 歷史價格趨勢", divider="gray")
 if not history_df.empty and len(history_df) > 0:
     st.write("透過點擊右側圖例可以隱藏或顯示特定資產")
     
-    assets = history_df['symbol'].unique()
-    selected_assets = st.multiselect("選擇要在圖表中顯示的資產", options=assets, default=assets)
+    # 過濾掉可能因為歷史遺留或欄位錯誤產生的無效資產符號
+    valid_assets = history_df['symbol'].dropna().unique()
     
-    if selected_assets:
-        filtered_df = history_df[history_df['symbol'].isin(selected_assets)]
+    if len(valid_assets) > 0:
+        selected_assets = st.multiselect("選擇要在圖表中顯示的資產", options=valid_assets, default=list(valid_assets)[:5]) # 預設只顯示前5個避免太雜
         
-        # 繪製 Plotly 圖表
-        fig = px.line(
-            filtered_df,
-            x="timestamp",
-            y="usd_price",
-            color="symbol",
-            markers=True,
-            title="資產價格變動趨勢",
-            labels={"usd_price": "價格 (USD)", "timestamp": "時間"},
-        )
-        # 如果資產價格範圍差太多，推薦使用者可以分別點擊或開對數座標，這裡給個選項
         use_log = st.checkbox("使用對數座標 (幫助同時觀察比特幣與小幣/ETF 的價格波動)")
-        if use_log:
-            fig.update_layout(yaxis_type="log")
+        
+        if selected_assets:
+            filtered_df = history_df[history_df['symbol'].isin(selected_assets)].copy()
+            # 確保價格欄位是數字，去除可能的異常值
+            filtered_df['usd_price'] = pd.to_numeric(filtered_df['usd_price'], errors='coerce')
+            filtered_df = filtered_df.dropna(subset=['usd_price'])
             
-        st.plotly_chart(fig, use_container_width=True)
+            if not filtered_df.empty:
+                try:
+                    # 繪製 Plotly 圖表
+                    fig = px.line(
+                        filtered_df,
+                        x="timestamp",
+                        y="usd_price",
+                        color="symbol",
+                        markers=True,
+                        title="資產價格變動趨勢",
+                        labels={"usd_price": "價格 (USD)", "timestamp": "時間"},
+                    )
+                    
+                    if use_log:
+                        fig.update_layout(yaxis_type="log")
+                        
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"⚠️ 繪製圖表時發生錯誤：{e}")
+            else:
+                st.warning("選擇的資產目前沒有有效的價格數據可供繪製。")
+    else:
+        st.info("資料庫中沒有找到有效的資產符號。")
 else:
     st.info("歷史資料庫目前沒有足夠的數據可供趨勢分析。")
 
