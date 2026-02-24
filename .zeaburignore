@@ -3,7 +3,11 @@ __pycache__/
 *.db
 .git/
 .github/
-.python-version
 uv.lock
 pyproject.toml
 package-lock.json
+oracle_sniper.py
+find_image.py
+*.pem
+*.key
+*.pub
