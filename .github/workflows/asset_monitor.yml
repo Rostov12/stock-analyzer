@@ -1,0 +1,72 @@
+name: 資產價格監控（加密貨幣 + 美股）
+
+on:
+  schedule:
+    - cron: '0 15,17,19,21 * * 1-5'
+    - cron: '0 */6 * * 0,6'
+  workflow_dispatch:
+    inputs:
+      threshold:
+        description: '警報閾值（%）'
+        required: false
+        default: '2.0'
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 代碼
+        uses: actions/checkout@v4
+
+      - name: 設置 Python 環境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安裝依賴
+        run: pip install requests yfinance
+
+      - name: 執行監控腳本
+        env:
+          THRESHOLD: ${{ github.event.inputs.threshold || '2.0' }}
+        run: python asset_monitor.py
+
+      - name: 顯示結果到 Step Summary
+        run: |
+          echo '## 📊 資產價格監控報告' >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat asset_status.json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: 發送 Telegram 通知
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python send_telegram.py
+
+      - name: 提交結果到 repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add asset_status.json
+          if git diff --cached --quiet; then
+            echo "無變更，跳過提交"
+          else
+            TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M')
+            git commit -m "🤖 更新資產價格 ${TIMESTAMP} UTC"
+            git push
+          fi
+
+      - name: 上傳 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-status-${{ github.run_number }}
+          path: asset_status.json
+          retention-days: 30

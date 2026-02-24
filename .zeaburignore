@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.db
+.git/
+.github/
+.python-version
+uv.lock
+pyproject.toml
+package-lock.json

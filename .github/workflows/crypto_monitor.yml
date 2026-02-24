@@ -1,0 +1,115 @@
+name: 加密貨幣價格監控
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      threshold:
+        description: '警報閾值（%）'
+        required: false
+        default: '2.0'
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 代碼
+        uses: actions/checkout@v4
+
+      - name: 設置 Python 環境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安裝依賴
+        run: pip install requests
+
+      - name: 執行監控腳本
+        env:
+          THRESHOLD: ${{ github.event.inputs.threshold || '2.0' }}
+        run: python crypto_monitor.py
+
+      - name: 顯示結果到 Step Summary
+        run: |
+          echo '## 📊 加密貨幣價格報告' >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat crypto_status.json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: 發送 Telegram 通知
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          BTC_PRICE=$(jq -r '.prices.btc.usd' crypto_status.json)
+          BTC_CHANGE=$(jq -r '.prices.btc.change_24h' crypto_status.json)
+          ETH_PRICE=$(jq -r '.prices.eth.usd' crypto_status.json)
+          ETH_CHANGE=$(jq -r '.prices.eth.change_24h' crypto_status.json)
+          SOL_PRICE=$(jq -r '.prices.sol.usd' crypto_status.json)
+          SOL_CHANGE=$(jq -r '.prices.sol.change_24h' crypto_status.json)
+          ADA_PRICE=$(jq -r '.prices.ada.usd' crypto_status.json)
+          ADA_CHANGE=$(jq -r '.prices.ada.change_24h' crypto_status.json)
+          
+          BTC_EMOJI="📈"
+          [ $(echo "$BTC_CHANGE < 0" | bc) -eq 1 ] && BTC_EMOJI="📉"
+          ETH_EMOJI="📈"
+          [ $(echo "$ETH_CHANGE < 0" | bc) -eq 1 ] && ETH_EMOJI="📉"
+          SOL_EMOJI="📈"
+          [ $(echo "$SOL_CHANGE < 0" | bc) -eq 1 ] && SOL_EMOJI="📉"
+          ADA_EMOJI="📈"
+          [ $(echo "$ADA_CHANGE < 0" | bc) -eq 1 ] && ADA_EMOJI="📉"
+          
+          ALERT_COUNT=$(jq -r '.alerts | length' crypto_status.json)
+          ALERT_TEXT="✅ 無警報"
+          if [ "$ALERT_COUNT" -gt 0 ]; then
+            ALERT_TEXT="🚨 ${ALERT_COUNT} 個警報觸發"
+          fi
+          
+          cat << EOF > telegram_message.txt
+          🚀 <b>加密貨幣價格監控報告</b> 📊
+          
+          ⏰ 時間: $(date -u '+%Y-%m-%d %H:%M UTC')
+          
+          💰 <b>價格更新</b>:
+          ${BTC_EMOJI} <b>BTC</b>: \$${BTC_PRICE} <code>(${BTC_CHANGE}%)</code>
+          ${ETH_EMOJI} <b>ETH</b>: \$${ETH_PRICE} <code>(${ETH_CHANGE}%)</code>
+          ${SOL_EMOJI} <b>SOL</b>: \$${SOL_PRICE} <code>(${SOL_CHANGE}%)</code>
+          ${ADA_EMOJI} <b>ADA</b>: \$${ADA_PRICE} <code>(${ADA_CHANGE}%)</code>
+          
+          ${ALERT_TEXT}
+          
+          📈 <a href='https://github.com/Rostov12/crypto-monitor/blob/main/crypto_status.json'>查看詳細報告</a>
+          EOF
+          
+          MESSAGE=$(cat telegram_message.txt)
+          
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+               -d chat_id="${TELEGRAM_CHAT_ID}" \
+               -d parse_mode="HTML" \
+               -d text="${MESSAGE}"
+
+      - name: 提交結果到 repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add crypto_status.json
+          if git diff --cached --quiet; then
+            echo "無變更，跳過提交"
+          else
+            TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M')
+            git commit -m "🤖 更新加密貨幣價格 ${TIMESTAMP} UTC"
+            git push
+          fi
+
+      - name: 上傳 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crypto-status-${{ github.run_number }}
+          path: crypto_status.json
+          retention-days: 30

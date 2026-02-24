@@ -1,0 +1,15 @@
+[project]
+name = "crypto-monitor"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "pandas>=2.3.3",
+    "plotly>=6.5.2",
+    "python-telegram-bot>=22.6",
+    "requests>=2.32.5",
+    "streamlit>=1.54.0",
+    "ta>=0.11.0",
+    "yfinance>=1.2.0",
+]
