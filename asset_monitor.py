@@ -22,14 +22,12 @@ COIN_MAP: dict[str, str] = {
     "bitcoin": "btc",
     "ethereum": "eth",
     "solana": "sol",
-    "cardano": "ada",
 }
 
 COIN_NAMES: dict[str, str] = {
     "btc": "Bitcoin",
     "eth": "Ethereum",
     "sol": "Solana",
-    "ada": "Cardano",
 }
 
 COINGECKO_API_URL = "https://api.coingecko.com/api/v3/simple/price"
@@ -39,8 +37,8 @@ ETF_MAP: dict[str, str] = {
     "SMH": "半導體ETF",
     "AIQ": "人工智慧ETF",
     "BOTZ": "機器人ETF",
-    "URNM": "鈾礦ETF",
     "NLR": "核能ETF",
+    "URNM": "鈾礦ETF",
     "GLD": "黃金ETF",
     "CPER": "銅ETF",
 }

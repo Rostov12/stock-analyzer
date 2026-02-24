@@ -7,7 +7,10 @@ import json
 import logging
 import os
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+
+import database
+import transaction_parser
 
 # 設定日誌
 logging.basicConfig(
@@ -98,6 +101,61 @@ async def alerts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = f"🚨 <b>目前共有 {len(alerts)} 個警報觸發：</b>\n\n" + "\n".join(alert_lines)
     await update.message.reply_text(message, parse_mode='HTML')
 
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """處理使用者上傳的截圖"""
+    if not update.message.photo:
+        return
+        
+    await update.message.reply_text("📸 收到截圖，正在讓 AI 努力辨識中...")
+    
+    try:
+        # 取得最高畫質的圖片
+        photo_file = await update.message.photo[-1].get_file()
+        image_bytes = await photo_file.download_as_bytearray()
+        
+        # 呼叫 Gemini 進行解析
+        result = transaction_parser.parse_transaction_image(bytes(image_bytes))
+        
+        if not result:
+            await update.message.reply_text("❌ 抱歉，AI 無法從這張截圖中辨識出完整的交易資訊。請確保截圖清晰且包含代號、買賣別、價格與數量。")
+            return
+            
+        symbol = result.get("symbol")
+        tx_type = result.get("transaction_type")
+        price = result.get("price")
+        quantity = result.get("quantity")
+        timestamp = result.get("timestamp", "未知時間")
+        
+        if symbol is None or tx_type is None or price is None or quantity is None:
+             await update.message.reply_text(f"⚠️ 辨識結果似乎有缺漏，請手動確認：\n{json.dumps(result, indent=2, ensure_ascii=False)}")
+             return
+             
+        # 確保格式正確後寫入資料庫
+        database.insert_transaction(
+            timestamp=str(timestamp), 
+            symbol=str(symbol), 
+            transaction_type=str(tx_type), 
+            price=float(price), 
+            quantity=float(quantity), 
+            notes="Telegram AI 自動匯入"
+        )
+        
+        total_value = float(price) * float(quantity)
+        reply_msg = (
+            "✅ <b>交易紀錄已成功寫入資料庫！</b>\n\n"
+            f"🔹 <b>標的:</b> {symbol}\n"
+            f"🔹 <b>動作:</b> {tx_type}\n"
+            f"🔹 <b>單價:</b> ${float(price):.2f}\n"
+            f"🔹 <b>數量:</b> {float(quantity):.4f}\n"
+            f"🔹 <b>總額:</b> ${total_value:.2f}\n"
+            f"🔹 <b>日期:</b> {timestamp}"
+        )
+        await update.message.reply_text(reply_msg, parse_mode='HTML')
+        
+    except Exception as e:
+        logging.error(f"處理圖片時發生錯誤: {e}")
+        await update.message.reply_text("❌ 處理圖片時發生嚴重錯誤，請檢查系統日誌。")
+
 def main():
     # 改從環境變數讀取，或者可以直接填入這裡
     bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '8589611809:AAGpQAQ3usjx8_9XTOKvpuEW9TkrMZYiwXU')
@@ -114,6 +172,9 @@ def main():
         application.add_handler(CommandHandler("start", start_command))
         application.add_handler(CommandHandler("status", status_command))
         application.add_handler(CommandHandler("alerts", alerts_command))
+        
+        # 註冊圖片處理器
+        application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
         logging.info("🤖 機器人已啟動，開始接收指令...")
         # 開始輪詢接收訊息

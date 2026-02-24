@@ -22,6 +22,18 @@ def init_db() -> None:
             change_24h REAL
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME NOT NULL,
+            symbol TEXT NOT NULL,
+            transaction_type TEXT NOT NULL, -- BUY or SELL
+            price REAL NOT NULL,
+            quantity REAL NOT NULL,
+            total_value REAL NOT NULL,
+            notes TEXT
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -67,6 +79,31 @@ def insert_prices(timestamp: str, crypto_data: dict[str, Any], stocks_data: dict
     conn.commit()
     conn.close()
     print(f"✅ 成功將 {len(records)} 筆資產價格寫入歷史資料庫。")
+
+def insert_transaction(timestamp: str, symbol: str, transaction_type: str, price: float, quantity: float, notes: str = "") -> None:
+    """
+    新增一筆買賣交易紀錄。
+    
+    Args:
+        timestamp: 交易時間 (ISO 8601 格式)。
+        symbol: 交易標的代號 (例如 BTC, TSLA)。
+        transaction_type: 交易類別 ('BUY' 或 'SELL')。
+        price: 成交單價。
+        quantity: 成交數量。
+        notes: 備註 (選填)。
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    total_value = price * quantity
+    
+    cursor.execute('''
+        INSERT INTO transactions (timestamp, symbol, transaction_type, price, quantity, total_value, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (timestamp, symbol.upper(), transaction_type.upper(), price, quantity, total_value, notes))
+    
+    conn.commit()
+    conn.close()
+    print(f"📝 記錄交易: {transaction_type.upper()} {quantity} {symbol.upper()} @ ${price}")
 
 if __name__ == "__main__":
     init_db()
