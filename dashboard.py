@@ -99,7 +99,12 @@ if not history_df.empty and len(history_df) > 0:
             filtered_df = history_df[history_df['symbol'].isin(selected_assets)].copy()
             # 確保價格欄位是數字，去除可能的異常值
             filtered_df['usd_price'] = pd.to_numeric(filtered_df['usd_price'], errors='coerce')
-            filtered_df = filtered_df.dropna(subset=['usd_price'])
+            
+            # 確保不會有 NaN 丟給前端，導致 JSON 轉換錯誤
+            filtered_df = filtered_df.dropna(subset=['usd_price', 'timestamp'])
+            
+            # 將時間強制轉為字串 ISO 格式，避免 DatetimeIndex 或 NaT 被丟到前端
+            filtered_df['timestamp'] = filtered_df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
             
             if not filtered_df.empty:
                 try:
