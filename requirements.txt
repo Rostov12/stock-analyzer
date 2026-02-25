@@ -202,6 +202,8 @@ rpds-py==0.30.0
     #   referencing
 rsa==4.9.1
     # via google-auth
+schedule==1.2.2
+    # via crypto-monitor
 six==1.17.0
     # via python-dateutil
 smmap==5.0.2

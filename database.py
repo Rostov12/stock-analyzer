@@ -34,6 +34,19 @@ def init_db() -> None:
             notes TEXT
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS asset_ohlcv (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date DATE NOT NULL,
+            symbol TEXT NOT NULL,
+            open REAL,
+            high REAL,
+            low REAL,
+            close REAL,
+            volume REAL,
+            UNIQUE(date, symbol) ON CONFLICT REPLACE
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -104,6 +117,25 @@ def insert_transaction(timestamp: str, symbol: str, transaction_type: str, price
     conn.commit()
     conn.close()
     print(f"📝 記錄交易: {transaction_type.upper()} {quantity} {symbol.upper()} @ ${price}")
+
+def insert_ohlcv_batch(records: list[tuple[str, str, float, float, float, float, float]]) -> None:
+    """
+    批次寫入 OHLCV 日 K 線資料。
+    
+    Args:
+        records: 包含 (date, symbol, open, high, low, close, volume) 的 tuple 列表。
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.executemany('''
+        INSERT OR REPLACE INTO asset_ohlcv (date, symbol, open, high, low, close, volume)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', records)
+    
+    conn.commit()
+    conn.close()
+    print(f"✅ 成功將 {len(records)} 筆 K 線資料寫入歷史資料庫。")
 
 if __name__ == "__main__":
     init_db()

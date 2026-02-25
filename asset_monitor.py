@@ -207,6 +207,58 @@ def print_report(
     print()
 
 
+def backfill_ohlcv() -> None:
+    """透過 yfinance 一次性回溯抓取一個月的日 K 線資料寫入 SQLite。"""
+    if yf is None:
+        print("⚠️ yfinance 未安裝，無法回溯 OHLCV 資料。")
+        return
+        
+    records = []
+    
+    # 處理加密貨幣 (yfinance ticker: BTC-USD, ETH-USD 等)
+    for symbol in COIN_MAP.values():
+        ticker = f"{symbol.upper()}-USD"
+        try:
+            t = yf.Ticker(ticker)
+            hist = t.history(period="1mo")
+            for index, row in hist.iterrows():
+                date_str = index.strftime('%Y-%m-%d')
+                records.append((
+                    date_str,
+                    symbol.upper(),
+                    float(row['Open']),
+                    float(row['High']),
+                    float(row['Low']),
+                    float(row['Close']),
+                    float(row['Volume'])
+                ))
+        except Exception as e:
+            print(f"⚠️ 獲取 {ticker} 歷史 K 線失敗: {e}")
+            
+    # 處理美股 ETF
+    for ticker in ETF_MAP.keys():
+        try:
+            t = yf.Ticker(ticker)
+            hist = t.history(period="1mo")
+            for index, row in hist.iterrows():
+                date_str = index.strftime('%Y-%m-%d')
+                records.append((
+                    date_str,
+                    ticker.upper(),
+                    float(row['Open']),
+                    float(row['High']),
+                    float(row['Low']),
+                    float(row['Close']),
+                    float(row['Volume'])
+                ))
+        except Exception as e:
+            print(f"⚠️ 獲取 {ticker} 歷史 K 線失敗: {e}")
+            
+    if records:
+        print(f"🔄 準備寫入 {len(records)} 筆歷史 OHLCV 資料...")
+        database.insert_ohlcv_batch(records)
+
+
 def main() -> None:
     """主程序入口。"""
     threshold = float(os.getenv("THRESHOLD", "2.0"))
@@ -262,6 +314,9 @@ def main() -> None:
     try:
         database.init_db()
         database.insert_prices(output["timestamp"], crypto, stocks)
+        
+        # 追加回溯並寫入 OHLCV 日 K 線資料
+        backfill_ohlcv()
     except Exception as e:
         print(f"⚠️  警告：寫入歷史資料庫失敗：{e}")
 
