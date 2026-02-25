@@ -159,44 +159,37 @@ if not history_df.empty and len(history_df) > 0:
 else:
     st.info("歷史資料庫 `asset_ohlcv` 目前沒有數據。請點擊「手動更新」來抓取過去三十天的歷史報價。")
 
-# 6. AI 交易截圖辨識入庫
-st.header("📸 交易截圖手動上傳與 AI 辨識", divider="gray")
-uploaded_file = st.file_uploader("請上傳一張交易明細截圖 (支援口袋證券等)", type=["png", "jpg", "jpeg"])
-
-if uploaded_file is not None:
-    if st.button("🚀 開始辨識並寫入資料庫"):
-        with st.spinner("AI 正在努力閱讀截圖中的數字..."):
-            bytes_data = uploaded_file.getvalue()
-            result, error_msg = transaction_parser.parse_transaction_image(bytes_data)
-            
-            if result:
-                # 強化入庫資料清洗
-                try:
-                    # 確保數字格式正確
-                    def clean_num(val):
-                        if isinstance(val, str):
-                            return float(val.replace(',', '').replace('$', '').replace('元', ''))
-                        return float(val)
-
-                    database.insert_transaction(
-                        timestamp=str(result.get("timestamp", pd.Timestamp.now().strftime("%Y-%m-%d"))),
-                        symbol=str(result.get("symbol", "UNKNOWN")),
-                        transaction_type=str(result.get("transaction_type", "BUY")),
-                        price=clean_num(result.get("price", 0)),
-                        quantity=clean_num(result.get("quantity", 0)),
-                        notes="Dashboard Web UI 上傳辨識"
-                    )
-                    st.success("✅ 記錄已成功自動寫入資料庫！")
-                    st.json(result)
-                except Exception as db_e:
-                    st.error(f"⚠️ 寫入資料庫失敗：{db_e}")
-                    st.json(result) # 顯示結果方便除錯
-            else:
-                st.error("❌ 抱歉，AI 辨識失敗或找不到完整的買賣資訊。")
-                if error_msg:
-                    st.warning(f"💡 系統偵錯訊息：\n{error_msg}")
-                else:
-                    st.warning("請確保金鑰正確且圖片清晰。")
+# 6. 買賣交易手動登錄
+st.header("📝 新增買賣交易紀錄", divider="gray")
+with st.form("transaction_form", clear_on_submit=True):
+    col1, col2 = st.columns(2)
+    with col1:
+        tx_date = st.date_input("交易日期", value=pd.Timestamp.now().date())
+        tx_symbol = st.text_input("資產代號 (例如 BTC, URNM)").upper()
+        tx_type = st.selectbox("買賣別", ["BUY", "SELL"])
+    with col2:
+        tx_price = st.number_input("成交單價", min_value=0.0, format="%.4f")
+        tx_quantity = st.number_input("成交數量", min_value=0.0, format="%.4f")
+        tx_notes = st.text_input("備註 (選填)")
+        
+    submitted = st.form_submit_button("💾 儲存紀錄")
+    
+    if submitted:
+        if tx_symbol and tx_price > 0 and tx_quantity > 0:
+            try:
+                database.insert_transaction(
+                    timestamp=tx_date.strftime("%Y-%m-%d"),
+                    symbol=tx_symbol,
+                    transaction_type=tx_type,
+                    price=tx_price,
+                    quantity=tx_quantity,
+                    notes=tx_notes if tx_notes else "Dashboard Web UI 手動登錄"
+                )
+                st.success(f"✅ 成功寫入紀錄: {tx_type} {tx_quantity} 股/枚 {tx_symbol} @ ${tx_price}")
+            except Exception as e:
+                st.error(f"⚠️ 寫入失敗: {e}")
+        else:
+            st.warning("⚠️ 請填寫完整的資產代號，且價格與數量必須大於 0。")
 
 # --- Footer ---
 st.caption("powered by Antigravity & Streamlit, made for Coilpot tutorial equivalent.")
