@@ -118,8 +118,12 @@ if not history_df.empty and len(history_df) > 0:
         selected_asset = st.selectbox("選擇要檢視 K 線的資產", options=valid_assets)
         
         if selected_asset:
+            # 限制資料量：只顯示最近 30 筆，避免 JSON 過大
             filtered_df = history_df[history_df['symbol'] == selected_asset].copy()
-            # 確保不會有 NaN 丟給前端，導致 JSON 轉換錯誤
+            filtered_df = filtered_df.sort_values('date', ascending=False).head(30)
+            filtered_df = filtered_df.sort_values('date', ascending=True)
+            
+            # 確保不會有 NaN 丟給前端
             filtered_df = filtered_df.dropna(subset=['open', 'high', 'low', 'close', 'date'])
             
             if not filtered_df.empty:
@@ -134,14 +138,18 @@ if not history_df.empty and len(history_df) > 0:
                     )])
                     
                     fig.update_layout(
-                        title=f"{selected_asset} 歷史日 K 線圖",
+                        title=f"{selected_asset} 最近 30 日 K 線圖",
                         yaxis_title="價格 (USD)",
                         xaxis_title="日期",
-                        xaxis_rangeslider_visible=False, # 關閉底部的範圍選擇器讓圖表更乾淨
-                        template="plotly_dark"
+                        xaxis_rangeslider_visible=False,
+                        template="plotly_dark",
+                        height=500,
+                        margin=dict(l=10, r=10, t=40, b=10)
                     )
-                        
-                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # 使用 staticPlot 或減少互動組件，降低 JSON 體積
+                    # config = {'displayModeBar': False, 'staticPlot': False}
+                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                 except Exception as e:
                     st.error(f"⚠️ 繪製圖表時發生錯誤：{e}")
             else:
@@ -162,20 +170,27 @@ if uploaded_file is not None:
             result = transaction_parser.parse_transaction_image(bytes_data)
             
             if result:
-                # 寫入資料庫
+                # 強化入庫資料清洗
                 try:
+                    # 確保數字格式正確
+                    def clean_num(val):
+                        if isinstance(val, str):
+                            return float(val.replace(',', '').replace('$', '').replace('元', ''))
+                        return float(val)
+
                     database.insert_transaction(
-                        timestamp=str(result["timestamp"]),
-                        symbol=str(result["symbol"]),
-                        transaction_type=str(result["transaction_type"]),
-                        price=float(result["price"]),
-                        quantity=float(result["quantity"]),
+                        timestamp=str(result.get("timestamp", pd.Timestamp.now().strftime("%Y-%m-%d"))),
+                        symbol=str(result.get("symbol", "UNKNOWN")),
+                        transaction_type=str(result.get("transaction_type", "BUY")),
+                        price=clean_num(result.get("price", 0)),
+                        quantity=clean_num(result.get("quantity", 0)),
                         notes="Dashboard Web UI 上傳辨識"
                     )
                     st.success("✅ 記錄已成功自動寫入資料庫！")
                     st.json(result)
                 except Exception as db_e:
                     st.error(f"⚠️ 寫入資料庫失敗：{db_e}")
+                    st.json(result) # 顯示結果方便除錯
             else:
                 st.error("❌ 抱歉，AI 辨識失敗或找不到完整的買賣資訊。請確保金鑰正確且圖片清晰。")
 

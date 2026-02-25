@@ -35,7 +35,6 @@ def parse_transaction_image(image_bytes: bytes, mime_type: str = "image/jpeg") -
     prompt = """
     這是一張券商APP(如口袋證券)的成交紀錄明細截圖。
     請仔細閱讀圖片中的詳細資料，並從中提取出以下資訊，嚴格以 JSON 格式回傳。
-    (請不要包含 ```json 代碼塊與多餘文字，只要回傳純 JSON 字串即可)
     
     JSON 格式定義：
     {
@@ -46,8 +45,11 @@ def parse_transaction_image(image_bytes: bytes, mime_type: str = "image/jpeg") -
         "timestamp": "成交日期與時間 (優先尋找「成交時間」，格式轉換為 YYYY-MM-DD 或 YYYY/MM/DD)"
     }
     
-    注意：畫面上可能同時列出多筆縮合的紀錄與一筆「展開詳細資訊」的紀錄。
-    請優先針對擁有「委託書號、交割金額、下單來源等完整明細」的那一筆紀錄進行解析。
+    重要指示：
+    1. 若畫面中文字顏色較淺或模糊，請根據上下文判斷。
+    2. 如果有多筆資料，請抓取「展開詳細資訊」的那一筆 (通常包含委託書號、手續費、稅費等細節)。
+    3. 只回傳 JSON 內容，不要包含 ```json 代碼塊或其他任何文字說明。
+    4. 確保輸出是合法的 JSON。
     """
     
     try:
@@ -58,11 +60,11 @@ def parse_transaction_image(image_bytes: bytes, mime_type: str = "image/jpeg") -
         
         text = response.text.strip()
         
-        # 清理可能附帶的 Markdown 標記
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.endswith("```"):
-            text = text[:-3]
+        # 強大清理邏輯：移除任何可能存在的 Markdown 標籤或說明文字
+        if "{" in text and "}" in text:
+            start_index = text.find("{")
+            end_index = text.rfind("}") + 1
+            text = text[start_index:end_index]
             
         result = json.loads(text.strip())
         return result
