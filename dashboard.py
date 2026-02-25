@@ -20,7 +20,8 @@ st.title("📈 資產價格監控看板")
 # 1.1 手動觸發更新按鈕
 if st.button("🔄 手動更新最新報價與歷史 K 線", help="這會在背景執行資料抓取，完成後請手動重新整理網頁。"):
     with st.spinner("資料抓取中 (預計 10-20 秒)，請稍候..."):
-        subprocess.run([sys.executable, "asset_monitor.py"])
+        # 在雲端環境中我們需要確保是透過 uv 來執行才能吃到套件
+        subprocess.run(["uv", "run", "python", "asset_monitor.py"])
     st.success("✅ 資料已成功更新！畫面即將重新整理...")
     st.rerun()
 
@@ -52,7 +53,18 @@ history_df = load_historical_data()
 # 4. 顯示最新即時概況 (Metrics)
 st.header("⚡ 最新資產概況", divider="gray")
 if status_data:
-    st.write(f"**最後更新時間**：{status_data.get('timestamp')}")
+    try:
+        from dateutil import parser
+        from datetime import timedelta
+        # 將 UTC 字串轉為 datetime 物件，然後加上 8 小時轉為台北時間
+        utc_time = parser.parse(status_data.get('timestamp', ''))
+        taipei_time = utc_time + timedelta(hours=8)
+        formatted_time = taipei_time.strftime("%Y年-%m月-%d日 %H:%M")
+    except Exception:
+        # 如果解析失敗，退回預設顯示
+        formatted_time = status_data.get('timestamp')
+        
+    st.write(f"**最後更新時間**：{formatted_time} (台北時間)")
     
     # 建立兩個分頁，一個放 Crypto，一個放 Stock
     tab1, tab2 = st.tabs(["加密貨幣 (Crypto)", "美股 ETF (Stocks)"])
