@@ -128,28 +128,28 @@ if not history_df.empty and len(history_df) > 0:
             
             if not filtered_df.empty:
                 try:
-                    fig = go.Figure(data=[go.Candlestick(
-                        x=filtered_df['date'],
-                        open=filtered_df['open'],
-                        high=filtered_df['high'],
-                        low=filtered_df['low'],
-                        close=filtered_df['close'],
-                        name=selected_asset
-                    )])
+                    import mplfinance as mpf
+                    import matplotlib.pyplot as plt
                     
-                    fig.update_layout(
+                    # mplfinance 需要 index 為 DatetimeIndex 且名稱為 Date
+                    filtered_df = filtered_df.rename(columns={'date': 'Date', 'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'})
+                    filtered_df = filtered_df.set_index('Date')
+                    
+                    # 繪製 mplfinance K 線圖並取得 figure 物件 (避開前端 JSON 渲染當機)
+                    fig, axlist = mpf.plot(
+                        filtered_df,
+                        type='candle',
+                        style='charles',
                         title=f"{selected_asset} 最近 30 日 K 線圖",
-                        yaxis_title="價格 (USD)",
-                        xaxis_title="日期",
-                        xaxis_rangeslider_visible=False,
-                        template="plotly_dark",
-                        height=500,
-                        margin=dict(l=10, r=10, t=40, b=10)
+                        ylabel="Price (USD)",
+                        volume=True,
+                        returnfig=True,
+                        figsize=(10, 6)
                     )
                     
-                    # 使用 staticPlot 或減少互動組件，降低 JSON 體積
-                    # config = {'displayModeBar': False, 'staticPlot': False}
-                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                    # 直接渲染成圖片，完全杜絕 Unexpected end of input
+                    st.pyplot(fig)
+                    
                 except Exception as e:
                     st.error(f"⚠️ 繪製圖表時發生錯誤：{e}")
             else:
@@ -167,7 +167,7 @@ if uploaded_file is not None:
     if st.button("🚀 開始辨識並寫入資料庫"):
         with st.spinner("AI 正在努力閱讀截圖中的數字..."):
             bytes_data = uploaded_file.getvalue()
-            result = transaction_parser.parse_transaction_image(bytes_data)
+            result, error_msg = transaction_parser.parse_transaction_image(bytes_data)
             
             if result:
                 # 強化入庫資料清洗
@@ -192,7 +192,11 @@ if uploaded_file is not None:
                     st.error(f"⚠️ 寫入資料庫失敗：{db_e}")
                     st.json(result) # 顯示結果方便除錯
             else:
-                st.error("❌ 抱歉，AI 辨識失敗或找不到完整的買賣資訊。請確保金鑰正確且圖片清晰。")
+                st.error("❌ 抱歉，AI 辨識失敗或找不到完整的買賣資訊。")
+                if error_msg:
+                    st.warning(f"💡 系統偵錯訊息：\n{error_msg}")
+                else:
+                    st.warning("請確保金鑰正確且圖片清晰。")
 
 # --- Footer ---
 st.caption("powered by Antigravity & Streamlit, made for Coilpot tutorial equivalent.")

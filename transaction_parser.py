@@ -2,7 +2,7 @@ import os
 import json
 import google.generativeai as genai
 
-def parse_transaction_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict | None:
+def parse_transaction_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> tuple[dict | None, str | None]:
     """
     使用 Gemini Vision 模型解析交易明細截圖，萃取交易資料。
     
@@ -11,7 +11,7 @@ def parse_transaction_image(image_bytes: bytes, mime_type: str = "image/jpeg") -
         mime_type: 圖片類型，預設為 image/jpeg。
         
     Returns:
-        解析成功的 JSON 字典，若失敗則回傳 None。
+        (JSON_Dict, 錯誤訊息)。若成功，錯誤訊息為 None；若失敗，JSON_Dict 為 None。
         格式範例:
         {
             "symbol": "URNM",
@@ -24,7 +24,7 @@ def parse_transaction_image(image_bytes: bytes, mime_type: str = "image/jpeg") -
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         print("⚠️ 錯誤: 找不到 GEMINI_API_KEY 環境變數。")
-        return None
+        return None, "找不到 GEMINI_API_KEY 環境變數。請確認已設定環境變數。"
         
     genai.configure(api_key=api_key)
     
@@ -67,15 +67,19 @@ def parse_transaction_image(image_bytes: bytes, mime_type: str = "image/jpeg") -
             text = text[start_index:end_index]
             
         result = json.loads(text.strip())
-        return result
+        return result, None
         
     except json.JSONDecodeError as e:
+        error_msg = f"AI 回傳了非 JSON 格式的內容: {response.text}"
         print(f"⚠️ 解析 JSON 失敗: {e}")
-        print(f"原始回傳內容: {response.text}")
-        return None
+        return None, error_msg
     except Exception as e:
-        print(f"⚠️ Gemini API 呼叫失敗: {e}")
-        return None
+        error_msg = f"Gemini API 處理過程中發生錯誤: {e}"
+        print(f"⚠️ {error_msg}")
+        # 如果是安全阻擋，這裡也可以捕捉
+        if hasattr(e, 'response') and hasattr(e.response, 'prompt_feedback'):
+            error_msg += f" (安全阻擋: {e.response.prompt_feedback})"
+        return None, error_msg
 
 # 測試用區塊
 if __name__ == "__main__":
