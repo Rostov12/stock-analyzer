@@ -1,6 +1,7 @@
 import os
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 def parse_transaction_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> tuple[dict | None, str | None]:
     """
@@ -26,11 +27,7 @@ def parse_transaction_image(image_bytes: bytes, mime_type: str = "image/jpeg") -
         print("⚠️ 錯誤: 找不到 GEMINI_API_KEY 環境變數。")
         return None, "找不到 GEMINI_API_KEY 環境變數。請確認已設定環境變數。"
         
-    genai.configure(api_key=api_key)
-    
-    # 選擇最新的輕量級多模態模型 (Gemini 1.5 Flash 或 2.5 Flash 提供高速視覺解析)
-    # 我們這裡使用 gemini-1.5-flash 作為預設相容穩定版
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    client = genai.Client(api_key=api_key)
     
     prompt = """
     這是一張券商APP(如口袋證券)的成交紀錄明細截圖。
@@ -53,10 +50,10 @@ def parse_transaction_image(image_bytes: bytes, mime_type: str = "image/jpeg") -
     """
     
     try:
-        response = model.generate_content([
-            prompt,
-            {"mime_type": mime_type, "data": image_bytes}
-        ])
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[prompt, types.Part.from_bytes(data=image_bytes, mime_type=mime_type)]
+        )
         
         text = response.text.strip()
         

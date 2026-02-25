@@ -69,8 +69,8 @@ if status_data:
         
     st.write(f"**最後更新時間**：{formatted_time} (台北時間)")
     
-    # 建立兩個分頁，一個放 Crypto，一個放 Stock
-    tab1, tab2 = st.tabs(["加密貨幣 (Crypto)", "美股 ETF (Stocks)"])
+    # 建立三個分頁
+    tab1, tab2, tab3 = st.tabs(["加密貨幣 (Crypto)", "美股 ETF (Stocks)", "📈 AI 智能報告"])
     
     with tab1:
         crypto_data = status_data.get("crypto", {})
@@ -97,6 +97,46 @@ if status_data:
         else:
             st.info("目前沒有美股 ETF 數據。")
             
+    with tab3:
+        st.subheader("🤖 AI 金融分析師")
+        st.write("點擊下方按鈕，系統將即時抓取最新報價，並交由 `Gemini-2.5-Flash` 撰寫專業分析報告。")
+        
+        col_r1, col_r2, col_r3 = st.columns(3)
+        with col_r1:
+            btn_us_intra = st.button("產出【美股盤中快報】")
+        with col_r2:
+            btn_us_close = st.button("產出【美股盤後總結】")
+        with col_r3:
+            btn_uranium = st.button("產出【鈾礦與核能專題】")
+            
+        if btn_us_intra:
+            with st.spinner("AI 正在分析美股盤中數據..."):
+                import report_generator
+                res = report_generator.generate_us_intraday_report()
+                st.session_state["last_report"] = res
+        if btn_us_close:
+            with st.spinner("AI 正在分析美股盤後數據..."):
+                import report_generator
+                res = report_generator.generate_us_close_report()
+                st.session_state["last_report"] = res
+        if btn_uranium:
+            with st.spinner("AI 正在深度分析鈾礦板塊..."):
+                import report_generator
+                res = report_generator.generate_uranium_report()
+                st.session_state["last_report"] = res
+                
+        if "last_report" in st.session_state:
+            st.markdown("---")
+            st.markdown(st.session_state["last_report"])
+            if st.button("📲 將此報告傳送至我的 Telegram", type="primary"):
+                import report_generator
+                with st.spinner("發送中..."):
+                    send_res = report_generator.send_telegram_report(st.session_state["last_report"])
+                    if "✅" in send_res:
+                        st.success(send_res)
+                    else:
+                        st.error(send_res)
+                
     # 警報區塊
     alerts = status_data.get("alerts", [])
     if alerts:
