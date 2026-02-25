@@ -20,10 +20,13 @@ st.title("📈 資產價格監控看板")
 # 1.1 手動觸發更新按鈕
 if st.button("🔄 手動更新最新報價與歷史 K 線", help="這會在背景執行資料抓取，完成後請手動重新整理網頁。"):
     with st.spinner("資料抓取中 (預計 10-20 秒)，請稍候..."):
-        # 在雲端環境中我們需要確保是透過 uv 來執行才能吃到套件
-        subprocess.run(["uv", "run", "python", "asset_monitor.py"])
-    st.success("✅ 資料已成功更新！畫面即將重新整理...")
-    st.rerun()
+        try:
+            import asset_monitor
+            asset_monitor.main()
+            st.success("✅ 資料已成功更新！畫面即將重新整理...")
+            st.rerun()
+        except Exception as e:
+            st.error(f"❌ 更新失敗: {e}")
 
 # 2. 讀取最新狀態 JSON
 @st.cache_data(ttl=60)
