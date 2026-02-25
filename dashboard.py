@@ -199,7 +199,7 @@ if not history_df.empty and len(history_df) > 0:
                     )
                     
                     # 使用 use_container_width 讓圖表自適應
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                     
                 except Exception as e:
                     st.error(f"⚠️ 繪製圖表時發生錯誤：{e}")
