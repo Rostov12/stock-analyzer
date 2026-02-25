@@ -86,16 +86,20 @@ if status_data:
     with tab2:
         stock_data = status_data.get("stocks", {})
         if stock_data:
-            # 每列顯示四個
-            cols = st.columns(4)
-            for i, (symbol, data) in enumerate(stock_data.items()):
-                cols[i % 4].metric(
-                    label=f"{symbol.upper()} ({data['name']})",
-                    value=f"${data['usd']:,.2f}",
-                    delta=f"{data['change_24h']}%",
-                )
+            stock_items = list(stock_data.items())
+            # 動態計算每列欄數，避免超出
+            cols_per_row = min(4, len(stock_items))
+            for row_start in range(0, len(stock_items), cols_per_row):
+                row_items = stock_items[row_start:row_start + cols_per_row]
+                cols = st.columns(len(row_items))
+                for j, (symbol, data) in enumerate(row_items):
+                    cols[j].metric(
+                        label=f"{symbol.upper()} ({data['name']})",
+                        value=f"${data['usd']:,.2f}",
+                        delta=f"{data['change_24h']}%",
+                    )
         else:
-            st.info("目前沒有美股 ETF 數據。")
+            st.info("目前沒有美股 ETF 數據。請點擊上方的「🔄 手動更新」按鈕抓取資料。")
             
     with tab3:
         st.subheader("🤖 AI 金融分析師")
@@ -142,53 +146,60 @@ if status_data:
     if alerts:
         st.error(f"🚨 觸發了 {len(alerts)} 筆警報！")
         for alert in alerts:
-            direction = "🔺 上漲" if alert["alert_type"] == "rise" else "🔻 下跌"
-            st.warning(f"{alert['type'].upper()} **{alert['symbol']}** {direction} 超過 {alert['threshold']}% (當前: {alert['change']:+.2f}%)")
+            if alert.get("alert_type") == "indicator_alert":
+                st.warning(f"⚠️ [技術指標] **{alert['symbol']}** 觸發：{alert.get('signal_reason', '未知')}")
+            else:
+                direction = "🔺 上漲" if alert["alert_type"] == "rise" else "🔻 下跌"
+                st.warning(f"{alert['type'].upper()} **{alert['symbol']}** {direction} 超過 {alert['threshold']}% (當前: {alert['change']:+.2f}%)")
 
 else:
     st.warning("找不到 `asset_status.json`，請先執行監控腳本抓取資料。")
 
-# 5. 歷史趨勢圖 (Candlestick)
+# 5. 歷史趨勢圖 (互動式 Plotly Candlestick)
 st.header("📊 歷史 K 線圖 (Candlestick)", divider="gray")
 if not history_df.empty and len(history_df) > 0:
     valid_assets = history_df['symbol'].dropna().unique()
     
     if len(valid_assets) > 0:
-        # K 線圖通常單獨檢視比較清楚
         selected_asset = st.selectbox("選擇要檢視 K 線的資產", options=valid_assets)
         
         if selected_asset:
-            # 限制資料量：只顯示最近 30 筆，避免 JSON 過大
+            # 取最近 30 筆，控制 JSON 大小
             filtered_df = history_df[history_df['symbol'] == selected_asset].copy()
             filtered_df = filtered_df.sort_values('date', ascending=False).head(30)
             filtered_df = filtered_df.sort_values('date', ascending=True)
-            
-            # 確保不會有 NaN 丟給前端
             filtered_df = filtered_df.dropna(subset=['open', 'high', 'low', 'close', 'date'])
             
             if not filtered_df.empty:
                 try:
-                    import mplfinance as mpf
-                    import matplotlib.pyplot as plt
+                    # 將數值強制轉為 Python float，避免 numpy 型別造成 JSON 序列化問題
+                    dates = filtered_df['date'].dt.strftime('%Y-%m-%d').tolist()
+                    opens = [float(v) for v in filtered_df['open']]
+                    highs = [float(v) for v in filtered_df['high']]
+                    lows = [float(v) for v in filtered_df['low']]
+                    closes = [float(v) for v in filtered_df['close']]
                     
-                    # mplfinance 需要 index 為 DatetimeIndex 且名稱為 Date
-                    filtered_df = filtered_df.rename(columns={'date': 'Date', 'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'})
-                    filtered_df = filtered_df.set_index('Date')
+                    fig = go.Figure(data=[go.Candlestick(
+                        x=dates,
+                        open=opens,
+                        high=highs,
+                        low=lows,
+                        close=closes,
+                        increasing_line_color='#ef5350',  # 紅漲
+                        decreasing_line_color='#26a69a',  # 綠跌
+                    )])
                     
-                    # 繪製 mplfinance K 線圖並取得 figure 物件 (避開前端 JSON 渲染當機)
-                    fig, axlist = mpf.plot(
-                        filtered_df,
-                        type='candle',
-                        style='charles',
+                    fig.update_layout(
                         title=f"{selected_asset} 最近 30 日 K 線圖",
-                        ylabel="Price (USD)",
-                        volume=True,
-                        returnfig=True,
-                        figsize=(10, 6)
+                        yaxis_title="Price (USD)",
+                        xaxis_rangeslider_visible=False,  # 關閉底部導覽列以減少 JSON
+                        height=450,
+                        margin=dict(l=40, r=40, t=40, b=40),
+                        template="plotly_dark",
                     )
                     
-                    # 直接渲染成圖片，完全杜絕 Unexpected end of input
-                    st.pyplot(fig)
+                    # 使用 use_container_width 讓圖表自適應
+                    st.plotly_chart(fig, use_container_width=True)
                     
                 except Exception as e:
                     st.error(f"⚠️ 繪製圖表時發生錯誤：{e}")
