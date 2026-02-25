@@ -170,36 +170,55 @@ if not history_df.empty and len(history_df) > 0:
             filtered_df = filtered_df.sort_values('date', ascending=True)
             filtered_df = filtered_df.dropna(subset=['open', 'high', 'low', 'close', 'date'])
             
-            if not filtered_df.empty:
                 try:
-                    # 將數值強制轉為 Python float，避免 numpy 型別造成 JSON 序列化問題
-                    dates = filtered_df['date'].dt.strftime('%Y-%m-%d').tolist()
-                    opens = [float(v) for v in filtered_df['open']]
-                    highs = [float(v) for v in filtered_df['high']]
-                    lows = [float(v) for v in filtered_df['low']]
-                    closes = [float(v) for v in filtered_df['close']]
+                    import altair as alt
                     
-                    fig = go.Figure(data=[go.Candlestick(
-                        x=dates,
-                        open=opens,
-                        high=highs,
-                        low=lows,
-                        close=closes,
-                        increasing_line_color='#ef5350',  # 紅漲
-                        decreasing_line_color='#26a69a',  # 綠跌
-                    )])
+                    # 必須確保日期是 datetime 格式，才能被 Altair 辨識為時序 T
+                    filtered_df['date'] = pd.to_datetime(filtered_df['date'])
                     
-                    fig.update_layout(
-                        title=f"{selected_asset} 最近 30 日 K 線圖",
-                        yaxis_title="Price (USD)",
-                        xaxis_rangeslider_visible=False,  # 關閉底部導覽列以減少 JSON
-                        height=450,
-                        margin=dict(l=40, r=40, t=40, b=40),
-                        template="plotly_dark",
+                    # 建立基礎圖表，設定 X 軸
+                    base = alt.Chart(filtered_df).encode(
+                        x=alt.X('date:T', 
+                                title='日期',
+                                axis=alt.Axis(format='%Y-%m-%d', labelAngle=-45, grid=False))
                     )
                     
-                    # 使用 use_container_width 讓圖表自適應
-                    st.plotly_chart(fig, width='stretch')
+                    # 設定綠跌紅漲的顏色條件
+                    color_cond = alt.condition(
+                        "datum.open <= datum.close",
+                        alt.value("#ef5350"), # 紅色 (收盤 >= 開盤，上漲)
+                        alt.value("#26a69a")  # 綠色 (收盤 < 開盤，下跌)
+                    )
+                    
+                    # 畫高低點的細線 (上下影線)
+                    rule = base.mark_rule().encode(
+                        y=alt.Y('low:Q', title='Price (USD)', scale=alt.Scale(zero=False)),
+                        y2='high:Q',
+                        color=color_cond,
+                        # 滑鼠懸浮時顯示完整 OHLC 報價
+                        tooltip=[
+                            alt.Tooltip('date:T', format='%Y-%m-%d', title='Date'),
+                            alt.Tooltip('open:Q', format='.2f', title='Open'),
+                            alt.Tooltip('high:Q', format='.2f', title='High'),
+                            alt.Tooltip('low:Q', format='.2f', title='Low'),
+                            alt.Tooltip('close:Q', format='.2f', title='Close')
+                        ]
+                    )
+                    
+                    # 畫開收盤的粗實體棒
+                    bar = base.mark_bar(size=12).encode(
+                        y='open:Q',
+                        y2='close:Q',
+                        color=color_cond
+                    )
+                    
+                    # 合併圖表並設定自適應寬度
+                    chart = (rule + bar).properties(
+                        title=f"{selected_asset} 最近 30 日 K 線趨勢",
+                        height=450
+                    ).interactive(bind_y=False) # 開啟 X 軸互動縮放
+                    
+                    st.altair_chart(chart, use_container_width=True)
                     
                 except Exception as e:
                     st.error(f"⚠️ 繪製圖表時發生錯誤：{e}")

@@ -1,105 +1,54 @@
 {
-  "timestamp": "2026-02-25T00:33:26.411234+00:00",
+  "timestamp": "2026-02-25T04:10:11.047096+00:00",
   "crypto": {
     "btc": {
       "type": "crypto",
       "name": "Bitcoin",
-      "usd": 64029,
-      "change_24h": -1.24
+      "usd": 65325,
+      "change_24h": 2.88
     },
     "eth": {
       "type": "crypto",
       "name": "Ethereum",
-      "usd": 1848.71,
-      "change_24h": -0.73
+      "usd": 1900.98,
+      "change_24h": 4.02
     },
     "sol": {
       "type": "crypto",
       "name": "Solana",
-      "usd": 78.85,
-      "change_24h": 0.83
+      "usd": 81.53,
+      "change_24h": 6.02
     }
   },
-  "stocks": {
-    "smh": {
-      "type": "stock",
-      "name": "半導體ETF",
-      "usd": 419.16,
-      "change_24h": 1.52
-    },
-    "aiq": {
-      "type": "stock",
-      "name": "人工智慧ETF",
-      "usd": 49.49,
-      "change_24h": 1.98
-    },
-    "botz": {
-      "type": "stock",
-      "name": "機器人ETF",
-      "usd": 39.01,
-      "change_24h": 1.11
-    },
-    "nlr": {
-      "type": "stock",
-      "name": "核能ETF",
-      "usd": 150.53,
-      "change_24h": 2.9
-    },
-    "urnm": {
-      "type": "stock",
-      "name": "鈾礦ETF",
-      "usd": 74.27,
-      "change_24h": 3.07
-    },
-    "gld": {
-      "type": "stock",
-      "name": "黃金ETF",
-      "usd": 474.61,
-      "change_24h": -1.39
-    },
-    "cper": {
-      "type": "stock",
-      "name": "銅ETF",
-      "usd": 36.3,
-      "change_24h": 1.74
-    }
-  },
-  "ta_signals": {
-    "ETH": {
-      "rsi": 29.91,
-      "macd": -174.52,
-      "macd_hist": 21.49,
-      "signal": "超賣 (RSI < 30)"
-    }
-  },
+  "stocks": {},
+  "ta_signals": {},
   "alerts": [
     {
-      "symbol": "NLR",
-      "type": "stock",
-      "name": "核能ETF",
+      "symbol": "BTC",
+      "type": "crypto",
+      "name": "Bitcoin",
       "alert_type": "rise",
-      "change": 2.9,
-      "threshold": 2.0,
-      "triggered": true
-    },
-    {
-      "symbol": "URNM",
-      "type": "stock",
-      "name": "鈾礦ETF",
-      "alert_type": "rise",
-      "change": 3.07,
+      "change": 2.88,
       "threshold": 2.0,
       "triggered": true
     },
     {
       "symbol": "ETH",
-      "type": "TA_SIGNAL",
-      "name": "ETH 技術指標",
-      "alert_type": "indicator_alert",
-      "change": 0.0,
-      "threshold": 0.0,
-      "triggered": true,
-      "signal_reason": "超賣 (RSI < 30)"
+      "type": "crypto",
+      "name": "Ethereum",
+      "alert_type": "rise",
+      "change": 4.02,
+      "threshold": 2.0,
+      "triggered": true
+    },
+    {
+      "symbol": "SOL",
+      "type": "crypto",
+      "name": "Solana",
+      "alert_type": "rise",
+      "change": 6.02,
+      "threshold": 2.0,
+      "triggered": true
     }
   ]
 }

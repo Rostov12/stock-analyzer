@@ -96,7 +96,7 @@ def fetch_stock_prices() -> dict[str, Any]:
     if yf is None:
         print("⚠️  警告：yfinance 未安裝，跳過股票數據")
         return {}
-
+        
     stocks: dict[str, Any] = {}
     for ticker, name in ETF_MAP.items():
         try:
@@ -238,7 +238,7 @@ def backfill_ohlcv() -> None:
     # 處理美股 ETF
     for ticker in ETF_MAP.keys():
         try:
-            t = yf.Ticker(ticker)
+            t = yf.Ticker(ticker, session=session)
             hist = t.history(period="1mo")
             for index, row in hist.iterrows():
                 date_str = index.strftime('%Y-%m-%d')
