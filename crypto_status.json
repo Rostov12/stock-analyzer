@@ -1,35 +1,22 @@
 {
-  "timestamp": "2026-02-27T01:50:25.001121+00:00",
+  "timestamp": "2026-02-27T06:49:57.637093+00:00",
   "prices": {
     "btc": {
-      "usd": 67278,
-      "change_24h": -1.6
+      "usd": 67798,
+      "change_24h": -0.5
     },
     "eth": {
-      "usd": 2017.72,
-      "change_24h": -1.94
+      "usd": 2038.8,
+      "change_24h": -1.15
     },
     "sol": {
-      "usd": 85.88,
-      "change_24h": -3.01
+      "usd": 87.31,
+      "change_24h": -0.37
     },
     "ada": {
       "usd": 0.29,
-      "change_24h": -3.28
+      "change_24h": -0.38
     }
   },
-  "alerts": [
-    {
-      "coin": "SOL",
-      "type": "drop",
-      "threshold": 2.0,
-      "triggered": true
-    },
-    {
-      "coin": "ADA",
-      "type": "drop",
-      "threshold": 2.0,
-      "triggered": true
-    }
-  ]
+  "alerts": []
 }
