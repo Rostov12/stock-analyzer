@@ -1,30 +1,24 @@
 {
-  "timestamp": "2026-03-03T12:51:57.515061+00:00",
+  "timestamp": "2026-03-03T18:42:46.269921+00:00",
   "prices": {
     "btc": {
-      "usd": 67317,
-      "change_24h": 2.01
+      "usd": 68793,
+      "change_24h": -0.41
     },
     "eth": {
-      "usd": 1966.01,
-      "change_24h": 1.35
+      "usd": 1996.35,
+      "change_24h": -1.76
     },
     "sol": {
-      "usd": 84.32,
-      "change_24h": 0.73
+      "usd": 85.77,
+      "change_24h": -1.94
     },
     "ada": {
-      "usd": 0.26,
-      "change_24h": -2.45
+      "usd": 0.27,
+      "change_24h": -4.56
     }
   },
   "alerts": [
-    {
-      "coin": "BTC",
-      "type": "rise",
-      "threshold": 2.0,
-      "triggered": true
-    },
     {
       "coin": "ADA",
       "type": "drop",
