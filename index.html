@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台股智慧分析工具</title>
+<style>
+/* ── CSS Variables ── */
+:root {
+  --bg: #0f1117;
+  --bg-card: #1a1d28;
+  --bg-input: #252836;
+  --border: #2d3148;
+  --text: #e8eaed;
+  --text-secondary: #9aa0b4;
+  --text-muted: #5f6580;
+  --primary: #4a90e2;
+  --primary-hover: #5ba0f2;
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #eab308;
+  --orange: #f59e0b;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+[data-theme="light"] {
+  --bg: #f5f6fa;
+  --bg-card: #fff;
+  --bg-input: #eef0f6;
+  --border: #d8dce6;
+  --text: #1a1d28;
+  --text-secondary: #4a5068;
+  --text-muted: #8890a8;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+a { color: var(--primary); text-decoration: none; }
+
+/* ── Layout ── */
+.container { max-width: 960px; margin: 0 auto; padding: 16px; }
+
+/* ── Header ── */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 0; border-bottom: 1px solid var(--border); margin-bottom: 20px;
+}
+.header h1 { font-size: 20px; font-weight: 700; }
+.header h1 span { color: var(--primary); }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.theme-btn {
+  background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted);
+  padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 14px;
+}
+.market-status {
+  font-size: 11px; padding: 4px 10px; border-radius: 20px;
+  background: rgba(239,68,68,0.1); color: #ef4444; font-weight: 600;
+}
+.market-status.open { background: rgba(34,197,94,0.1); color: #22c55e; }
+
+/* ── Search ── */
+.search-wrap {
+  position: relative; margin-bottom: 24px;
+}
+.search-input {
+  width: 100%; padding: 14px 18px 14px 44px; font-size: 16px;
+  background: var(--bg-card); border: 2px solid var(--border); border-radius: var(--radius);
+  color: var(--text); outline: none; transition: border-color 0.2s;
+}
+.search-input:focus { border-color: var(--primary); }
+.search-input::placeholder { color: var(--text-muted); }
+.search-icon {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  font-size: 18px; color: var(--text-muted); pointer-events: none;
+}
+.autocomplete-list {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  max-height: 300px; overflow-y: auto; display: none; box-shadow: var(--shadow);
+  margin-top: 4px;
+}
+.autocomplete-list.show { display: block; }
+.ac-item {
+  padding: 10px 16px; cursor: pointer; display: flex; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.ac-item:hover, .ac-item.active { background: var(--bg-input); }
+.ac-item .ac-code { font-weight: 600; color: var(--primary); }
+.ac-item .ac-name { color: var(--text-secondary); font-size: 14px; }
+
+/* ── Loading ── */
+.loading-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15,17,23,0.7); z-index: 200; justify-content: center; align-items: center;
+}
+.loading-overlay.show { display: flex; }
+.spinner {
+  width: 40px; height: 40px; border: 3px solid var(--border);
+  border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { color: var(--text-secondary); margin-top: 12px; font-size: 14px; text-align: center; }
+
+/* ── Cards ── */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow);
+}
+.card h2 { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+
+/* ── Price Header ── */
+.price-header {
+  display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.stock-name { font-size: 24px; font-weight: 800; }
+.stock-code { font-size: 14px; color: var(--text-muted); }
+.stock-price { font-size: 36px; font-weight: 800; }
+.stock-change { font-size: 18px; font-weight: 600; margin-left: 8px; }
+.up { color: var(--red); }
+.down { color: var(--green); }
+.flat { color: var(--text-muted); }
+
+/* ── Quick Stats ── */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;
+}
+.stat-item {
+  background: var(--bg-input); border-radius: 10px; padding: 12px; text-align: center;
+}
+.stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.stat-value { font-size: 16px; font-weight: 700; }
+
+/* ── Technical Indicators ── */
+.tech-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;
+}
+.tech-card {
+  background: var(--bg-input); border-radius: 10px; padding: 14px;
+  border-left: 3px solid var(--text-muted);
+}
+.tech-card.bullish { border-left-color: var(--red); }
+.tech-card.bearish { border-left-color: var(--green); }
+.tech-card.neutral { border-left-color: var(--yellow); }
+.tech-name { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.tech-value { font-size: 18px; font-weight: 700; }
+.tech-signal { font-size: 11px; margin-top: 4px; font-weight: 600; }
+
+/* ── Score Gauge ── */
+.score-wrap { text-align: center; padding: 20px 0; }
+.score-circle {
+  width: 120px; height: 120px; border-radius: 50%; display: inline-flex;
+  align-items: center; justify-content: center; flex-direction: column;
+  border: 4px solid var(--border); font-size: 36px; font-weight: 800;
+}
+.score-label { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+
+/* ── Chart ── */
+.chart-container { position: relative; width: 100%; }
+.chart-container canvas { width: 100%; height: auto; display: block; }
+
+/* ── Chip Data ── */
+.chip-bar {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+}
+.chip-label { font-size: 12px; min-width: 50px; color: var(--text-secondary); }
+.chip-track { flex: 1; height: 22px; background: var(--bg); border-radius: 6px; overflow: hidden; position: relative; }
+.chip-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding: 0 8px; font-size: 11px; font-weight: 600; color: #fff; min-width: 40px; }
+.chip-buy { background: var(--red); }
+.chip-sell { background: var(--green); }
+.chip-value { font-size: 12px; min-width: 80px; text-align: right; font-weight: 600; }
+
+/* ── AI Report ── */
+.ai-report {
+  background: linear-gradient(135deg, rgba(74,144,226,0.06), rgba(99,102,241,0.06));
+  border: 1px solid rgba(74,144,226,0.2); border-radius: var(--radius); padding: 18px;
+}
+.ai-report .ai-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--primary); margin-right: 6px; animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.ai-report pre {
+  white-space: pre-wrap; font-family: inherit; font-size: 14px;
+  line-height: 1.7; color: var(--text-secondary); margin-top: 10px;
+}
+.ai-placeholder {
+  text-align: center; padding: 30px; color: var(--text-muted); font-size: 14px;
+}
+
+/* ── Welcome ── */
+.welcome {
+  text-align: center; padding: 80px 20px; color: var(--text-muted);
+}
+.welcome h2 { font-size: 22px; color: var(--text); margin-bottom: 12px; }
+.welcome p { font-size: 14px; max-width: 400px; margin: 0 auto 20px; line-height: 1.7; }
+.hot-stocks { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+.hot-btn {
+  background: var(--bg-input); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 13px;
+  transition: all 0.2s;
+}
+.hot-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+/* ── Footer ── */
+.footer {
+  text-align: center; padding: 30px 0; color: var(--text-muted); font-size: 11px;
+  border-top: 1px solid var(--border); margin-top: 30px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .container { padding: 10px; }
+  .header h1 { font-size: 16px; }
+  .stock-price { font-size: 28px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .tech-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <h1>📊 台股<span>智慧分析</span></h1>
+    <div class="header-actions">
+      <span id="market-status" class="market-status">休市</span>
+      <button class="theme-btn" onclick="toggleTheme()" title="切換主題">🌓</button>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" class="search-input" id="search" placeholder="輸入股票代號或名稱（如：2330、台積電）" autocomplete="off">
+    <div class="autocomplete-list" id="ac-list"></div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-overlay" id="loading">
+    <div>
+      <div class="spinner"></div>
+      <div class="loading-text" id="loading-text">正在分析...</div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div id="app">
+    <div class="welcome">
+      <h2>台股即時分析工具</h2>
+      <p>輸入股票代號或名稱，即時取得技術分析、籌碼面數據與 AI 診斷報告</p>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px">資料來源：TWSE / Yahoo Finance | AI：MiniMAX 2.5</div>
+      <div class="hot-stocks">
+        <button class="hot-btn" onclick="analyze('2330')">2330 台積電</button>
+        <button class="hot-btn" onclick="analyze('2317')">2317 鴻海</button>
+        <button class="hot-btn" onclick="analyze('2454')">2454 聯發科</button>
+        <button class="hot-btn" onclick="analyze('2881')">2881 富邦金</button>
+        <button class="hot-btn" onclick="analyze('0050')">0050 元大50</button>
+        <button class="hot-btn" onclick="analyze('2603')">2603 長榮</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    台股智慧分析工具 v1.0 | 資料僅供參考，不構成投資建議 | AI Model: MiniMAX 2.5
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   台股智慧分析工具 — 主程式
+   ══════════════════════════════════════════════════════ */
+
+// ── 台股常用股票清單 ──
+const STOCK_LIST = [
+  {code:'2330',name:'台積電',sector:'半導體'},{code:'2317',name:'鴻海',sector:'電子代工'},
+  {code:'2454',name:'聯發科',sector:'IC設計'},{code:'2308',name:'台達電',sector:'電源'},
+  {code:'2382',name:'廣達',sector:'伺服器'},{code:'2412',name:'中華電',sector:'電信'},
+  {code:'2881',name:'富邦金',sector:'金融'},{code:'2882',name:'國泰金',sector:'金融'},
+  {code:'2884',name:'玉山金',sector:'金融'},{code:'2886',name:'兆豐金',sector:'金融'},
+  {code:'2891',name:'中信金',sector:'金融'},{code:'2892',name:'第一金',sector:'金融'},
+  {code:'2303',name:'聯電',sector:'半導體'},{code:'3711',name:'日月光投控',sector:'封測'},
+  {code:'2357',name:'華碩',sector:'PC'},{code:'2301',name:'光寶科',sector:'電源'},
+  {code:'2002',name:'中鋼',sector:'鋼鐵'},{code:'1301',name:'台塑',sector:'塑化'},
+  {code:'1303',name:'南亞',sector:'塑化'},{code:'1326',name:'台化',sector:'塑化'},
+  {code:'2603',name:'長榮',sector:'航運'},{code:'2609',name:'陽明',sector:'航運'},
+  {code:'2615',name:'萬海',sector:'航運'},{code:'3037',name:'欣興',sector:'PCB'},
+  {code:'2345',name:'智邦',sector:'網通'},{code:'4904',name:'遠傳',sector:'電信'},
+  {code:'2207',name:'和泰車',sector:'汽車'},{code:'1216',name:'統一',sector:'食品'},
+  {code:'2912',name:'統一超',sector:'零售'},{code:'5880',name:'合庫金',sector:'金融'},
+  {code:'2880',name:'華南金',sector:'金融'},{code:'2883',name:'開發金',sector:'金融'},
+  {code:'3034',name:'聯詠',sector:'IC設計'},{code:'2379',name:'瑞昱',sector:'IC設計'},
+  {code:'3661',name:'世芯-KY',sector:'IC設計'},{code:'6505',name:'台塑化',sector:'塑化'},
+  {code:'5871',name:'中租-KY',sector:'租賃'},{code:'2395',name:'研華',sector:'工業電腦'},
+  {code:'3231',name:'緯創',sector:'伺服器'},{code:'2356',name:'英業達',sector:'伺服器'},
+  {code:'6669',name:'緯穎',sector:'伺服器'},{code:'2327',name:'國巨',sector:'被動元件'},
+  {code:'3008',name:'大立光',sector:'光學'},{code:'2408',name:'南亞科',sector:'記憶體'},
+  {code:'3443',name:'創意',sector:'IC設計'},{code:'2474',name:'可成',sector:'機殼'},
+  {code:'0050',name:'元大台灣50',sector:'ETF'},{code:'0056',name:'元大高股息',sector:'ETF'},
+  {code:'00878',name:'國泰永續高股息',sector:'ETF'},{code:'00919',name:'群益台灣精選高息',sector:'ETF'},
+  {code:'00940',name:'元大台灣價值高息',sector:'ETF'},{code:'00929',name:'復華台灣科技優息',sector:'ETF'},
+  {code:'6770',name:'力積電',sector:'半導體'},{code:'3529',name:'力旺',sector:'IP'},
+  {code:'2049',name:'上銀',sector:'自動化'},{code:'1590',name:'亞德客-KY',sector:'自動化'},
+  {code:'6488',name:'環球晶',sector:'矽晶圓'},{code:'3533',name:'嘉澤',sector:'連接器'},
+  {code:'6547',name:'高端疫苗',sector:'生技'},{code:'4743',name:'合一',sector:'生技'},
+  {code:'6446',name:'藥華藥',sector:'生技'},{code:'3105',name:'穩懋',sector:'砷化鎵'},
+  {code:'5274',name:'信驊',sector:'IC設計'},{code:'6414',name:'樺漢',sector:'工業電腦'},
+  {code:'2376',name:'技嘉',sector:'板卡'},{code:'3017',name:'奇鋐',sector:'散熱'},
+  {code:'3443',name:'創意',sector:'矽智財'},{code:'2618',name:'長榮航',sector:'航空'},
+  {code:'6239',name:'力成',sector:'封測'},{code:'5347',name:'世界',sector:'IC通路'},
+];
+
+// ── CORS Proxy 列表（多源備援）──
+const PROXIES = [
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+];
+let proxyIdx = 0;
+
+async function corsGet(url) {
+  for (let i = 0; i < PROXIES.length; i++) {
+    const idx = (proxyIdx + i) % PROXIES.length;
+    try {
+      const r = await fetch(PROXIES[idx](url), { signal: AbortSignal.timeout(8000) });
+      if (r.ok) { proxyIdx = idx; return r; }
+    } catch {}
+  }
+  // 最後嘗試直接請求
+  return fetch(url, { signal: AbortSignal.timeout(8000) });
+}
+
+// ── Theme ──
+function toggleTheme() {
+  const t = document.documentElement.getAttribute('data-theme') === 'light' ? '' : 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+}
+(function() {
+  const t = localStorage.getItem('theme');
+  if (t) document.documentElement.setAttribute('data-theme', t);
+})();
+
+// ── Market Status ──
+function updateMarketStatus() {
+  const el = document.getElementById('market-status');
+  const now = new Date();
+  const twH = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+  const h = twH.getHours(), m = twH.getMinutes(), d = twH.getDay();
+  const mins = h * 60 + m;
+  const isWeekday = d >= 1 && d <= 5;
+  const isOpen = isWeekday && mins >= 540 && mins <= 810; // 09:00 - 13:30
+  el.className = 'market-status' + (isOpen ? ' open' : '');
+  el.textContent = isOpen ? '● 開盤中' : '○ 休市';
+}
+updateMarketStatus();
+setInterval(updateMarketStatus, 60000);
+
+// ── Autocomplete ──
+const searchEl = document.getElementById('search');
+const acList = document.getElementById('ac-list');
+let acIdx = -1;
+
+searchEl.addEventListener('input', () => {
+  const q = searchEl.value.trim().toLowerCase();
+  if (!q) { acList.classList.remove('show'); return; }
+  const matches = STOCK_LIST.filter(s =>
+    s.code.includes(q) || s.name.toLowerCase().includes(q) || s.sector.toLowerCase().includes(q)
+  ).slice(0, 10);
+  if (!matches.length) { acList.classList.remove('show'); return; }
+  acIdx = -1;
+  acList.innerHTML = matches.map((s, i) =>
+    `<div class="ac-item" data-code="${s.code}" onclick="analyze('${s.code}')">
+      <span class="ac-code">${s.code}</span>
+      <span class="ac-name">${s.name} · ${s.sector}</span>
+    </div>`
+  ).join('');
+  acList.classList.add('show');
+});
+
+searchEl.addEventListener('keydown', e => {
+  const items = acList.querySelectorAll('.ac-item');
+  if (e.key === 'ArrowDown') { e.preventDefault(); acIdx = Math.min(acIdx + 1, items.length - 1); highlightAC(items); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); acIdx = Math.max(acIdx - 1, 0); highlightAC(items); }
+  else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (acIdx >= 0 && items[acIdx]) analyze(items[acIdx].dataset.code);
+    else if (searchEl.value.trim()) analyze(searchEl.value.trim());
+  }
+  else if (e.key === 'Escape') acList.classList.remove('show');
+});
+
+function highlightAC(items) {
+  items.forEach((el, i) => el.classList.toggle('active', i === acIdx));
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-wrap')) acList.classList.remove('show');
+});
+
+// ── Data Fetching ──
+
+async function fetchTWSEQuote(code) {
+  // TWSE 即時報價 API
+  const url = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${code}.tw&json=1&delay=0&_=${Date.now()}`;
+  try {
+    const r = await corsGet(url);
+    const data = await r.json();
+    if (data.msgArray && data.msgArray.length) {
+      const s = data.msgArray[0];
+      return {
+        code: s.c,
+        name: s.n,
+        price: parseFloat(s.z) || parseFloat(s.y),
+        open: parseFloat(s.o),
+        high: parseFloat(s.h),
+        low: parseFloat(s.l),
+        yesterday: parseFloat(s.y),
+        volume: parseInt(s.v) || 0,
+        time: s.t,
+      };
+    }
+  } catch {}
+  // OTC 試試
+  try {
+    const url2 = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=otc_${code}.tw&json=1&delay=0&_=${Date.now()}`;
+    const r = await corsGet(url2);
+    const data = await r.json();
+    if (data.msgArray && data.msgArray.length) {
+      const s = data.msgArray[0];
+      return { code: s.c, name: s.n, price: parseFloat(s.z) || parseFloat(s.y), open: parseFloat(s.o), high: parseFloat(s.h), low: parseFloat(s.l), yesterday: parseFloat(s.y), volume: parseInt(s.v) || 0, time: s.t };
+    }
+  } catch {}
+  return null;
+}
+
+async function fetchYahooHistory(code, range = '3mo') {
+  const sym = `${code}.TW`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${range}&interval=1d`;
+  try {
+    const r = await corsGet(url);
+    const data = await r.json();
+    const result = data.chart?.result?.[0];
+    if (!result) throw new Error('no data');
+    const ts = result.timestamp || [];
+    const q = result.indicators?.quote?.[0] || {};
+    const rows = [];
+    for (let i = 0; i < ts.length; i++) {
+      if (q.close[i] == null) continue;
+      rows.push({
+        date: new Date(ts[i] * 1000).toISOString().slice(0, 10),
+        open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i],
+        volume: q.volume[i] || 0,
+      });
+    }
+    return rows;
+  } catch {
+    // 嘗試 .TWO (OTC)
+    try {
+      const sym2 = `${code}.TWO`;
+      const url2 = `https://query1.finance.yahoo.com/v8/finance/chart/${sym2}?range=${range}&interval=1d`;
+      const r = await corsGet(url2);
+      const data = await r.json();
+      const result = data.chart?.result?.[0];
+      if (!result) return [];
+      const ts = result.timestamp || [];
+      const q = result.indicators?.quote?.[0] || {};
+      const rows = [];
+      for (let i = 0; i < ts.length; i++) {
+        if (q.close[i] == null) continue;
+        rows.push({ date: new Date(ts[i]*1000).toISOString().slice(0,10), open:q.open[i], high:q.high[i], low:q.low[i], close:q.close[i], volume:q.volume[i]||0 });
+      }
+      return rows;
+    } catch { return []; }
+  }
+}
+
+async function fetchChipData(code) {
+  // 三大法人買賣超（TWSE API）
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  try {
+    const url = `https://www.twse.com.tw/rwd/zh/fund/T86?date=${dateStr}&selectType=ALL&response=json&_=${Date.now()}`;
+    const r = await corsGet(url);
+    const data = await r.json();
+    if (data.data) {
+      const row = data.data.find(d => d[0]?.trim() === code);
+      if (row) {
+        return {
+          foreign_buy: parseNum(row[2]),
+          foreign_sell: parseNum(row[3]),
+          foreign_net: parseNum(row[4]),
+          trust_buy: parseNum(row[5]),
+          trust_sell: parseNum(row[6]),
+          trust_net: parseNum(row[7]),
+          dealer_net: parseNum(row[10]),
+          total_net: parseNum(row[11]),
+        };
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function parseNum(s) {
+  if (!s) return 0;
+  return parseInt(String(s).replace(/,/g, '')) || 0;
+}
+
+// ── Technical Indicators ──
+
+function calcMA(closes, period) {
+  const result = [];
+  for (let i = 0; i < closes.length; i++) {
+    if (i < period - 1) { result.push(null); continue; }
+    let sum = 0;
+    for (let j = 0; j < period; j++) sum += closes[i - j];
+    result.push(sum / period);
+  }
+  return result;
+}
+
+function calcRSI(closes, period = 14) {
+  const result = [];
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 0; i < closes.length; i++) {
+    if (i === 0) { result.push(null); continue; }
+    const change = closes[i] - closes[i - 1];
+    const gain = Math.max(change, 0);
+    const loss = Math.max(-change, 0);
+    if (i <= period) {
+      avgGain += gain; avgLoss += loss;
+      if (i === period) {
+        avgGain /= period; avgLoss /= period;
+        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+        result.push(100 - 100 / (1 + rs));
+      } else { result.push(null); }
+    } else {
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+      const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+      result.push(100 - 100 / (1 + rs));
+    }
+  }
+  return result;
+}
+
+function calcKD(highs, lows, closes, period = 9) {
+  const kArr = [], dArr = [];
+  let prevK = 50, prevD = 50;
+  for (let i = 0; i < closes.length; i++) {
+    if (i < period - 1) { kArr.push(null); dArr.push(null); continue; }
+    let hh = -Infinity, ll = Infinity;
+    for (let j = 0; j < period; j++) { hh = Math.max(hh, highs[i-j]); ll = Math.min(ll, lows[i-j]); }
+    const rsv = hh === ll ? 50 : (closes[i] - ll) / (hh - ll) * 100;
+    const k = prevK * 2 / 3 + rsv / 3;
+    const d = prevD * 2 / 3 + k / 3;
+    kArr.push(k); dArr.push(d);
+    prevK = k; prevD = d;
+  }
+  return { k: kArr, d: dArr };
+}
+
+function calcMACD(closes, fast = 12, slow = 26, signal = 9) {
+  function ema(data, period) {
+    const result = [];
+    const k = 2 / (period + 1);
+    for (let i = 0; i < data.length; i++) {
+      if (i === 0) result.push(data[i]);
+      else result.push(data[i] * k + result[i-1] * (1 - k));
+    }
+    return result;
+  }
+  const emaFast = ema(closes, fast);
+  const emaSlow = ema(closes, slow);
+  const dif = emaFast.map((f, i) => f - emaSlow[i]);
+  const dea = ema(dif, signal);
+  const bar = dif.map((d, i) => (d - dea[i]) * 2);
+  return { dif, dea, bar };
+}
+
+function calcBollinger(closes, period = 20, mult = 2) {
+  const ma = calcMA(closes, period);
+  const upper = [], lower = [];
+  for (let i = 0; i < closes.length; i++) {
+    if (ma[i] == null) { upper.push(null); lower.push(null); continue; }
+    let sumSq = 0;
+    for (let j = 0; j < period; j++) sumSq += Math.pow(closes[i-j] - ma[i], 2);
+    const std = Math.sqrt(sumSq / period);
+    upper.push(ma[i] + mult * std);
+    lower.push(ma[i] - mult * std);
+  }
+  return { upper, middle: ma, lower };
+}
+
+// ── Comprehensive Score ──
+function calcScore(closes, highs, lows, rsi, kd, macd, boll) {
+  let score = 50;
+  const last = closes.length - 1;
+  const c = closes[last];
+
+  // RSI
+  const rsiVal = rsi[last];
+  if (rsiVal != null) {
+    if (rsiVal < 30) score += 15;
+    else if (rsiVal < 45) score += 8;
+    else if (rsiVal > 70) score -= 15;
+    else if (rsiVal > 60) score -= 5;
+  }
+
+  // KD
+  if (kd.k[last] != null) {
+    if (kd.k[last] < 20) score += 12;
+    else if (kd.k[last] > 80) score -= 12;
+    if (kd.k[last] > kd.d[last] && kd.k[last-1] <= kd.d[last-1]) score += 10; // 黃金交叉
+    if (kd.k[last] < kd.d[last] && kd.k[last-1] >= kd.d[last-1]) score -= 10; // 死亡交叉
+  }
+
+  // MACD
+  if (macd.bar[last] > 0 && macd.bar[last-1] <= 0) score += 10;
+  if (macd.bar[last] < 0 && macd.bar[last-1] >= 0) score -= 10;
+  if (macd.dif[last] > macd.dea[last]) score += 5;
+  else score -= 5;
+
+  // Bollinger
+  if (boll.lower[last] != null) {
+    if (c <= boll.lower[last]) score += 10;
+    if (c >= boll.upper[last]) score -= 10;
+  }
+
+  // MA trend
+  const ma5 = calcMA(closes, 5);
+  const ma20 = calcMA(closes, 20);
+  if (ma5[last] != null && ma20[last] != null) {
+    if (ma5[last] > ma20[last]) score += 5;
+    else score -= 5;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+// ── Chart Drawing ──
+function drawKLineChart(canvasId, history, ma5, ma20, boll) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth;
+  const H_PRICE = 280;
+  const H_VOL = 60;
+  const H = H_PRICE + H_VOL + 30;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+
+  const isDark = !document.documentElement.getAttribute('data-theme');
+  const bgColor = isDark ? '#1a1d28' : '#fff';
+  const gridColor = isDark ? '#2d314822' : '#e0e0e044';
+  const textColor = isDark ? '#5f6580' : '#8890a8';
+
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, W, H);
+
+  const data = history.slice(-60); // 最近 60 天
+  const n = data.length;
+  if (!n) return;
+
+  const PAD_L = 55, PAD_R = 10, PAD_T = 10, PAD_B = 20;
+  const chartW = W - PAD_L - PAD_R;
+  const barW = chartW / n;
+  const candleW = Math.max(barW * 0.6, 2);
+
+  // Price range
+  const allPrices = data.flatMap(d => [d.high, d.low]);
+  let pMin = Math.min(...allPrices), pMax = Math.max(...allPrices);
+  const pPad = (pMax - pMin) * 0.08;
+  pMin -= pPad; pMax += pPad;
+  const pRange = pMax - pMin || 1;
+  const toY = v => PAD_T + (1 - (v - pMin) / pRange) * H_PRICE;
+
+  // Volume range
+  const vMax = Math.max(...data.map(d => d.volume)) || 1;
+  const volBase = PAD_T + H_PRICE + 10;
+  const toVolY = v => volBase + H_VOL - (v / vMax) * H_VOL;
+
+  // Grid lines
+  ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD_T + (H_PRICE / 4) * i;
+    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+    const price = pMax - (pRange / 4) * i;
+    ctx.fillStyle = textColor; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(price.toFixed(price > 100 ? 0 : 2), PAD_L - 5, y + 4);
+  }
+
+  // Bollinger bands
+  if (boll) {
+    const offset = history.length - n;
+    ctx.save(); ctx.globalAlpha = 0.1;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const x = PAD_L + barW * i + barW / 2;
+      const idx = offset + i;
+      if (boll.upper[idx] != null) {
+        if (i === 0) ctx.moveTo(x, toY(boll.upper[idx]));
+        else ctx.lineTo(x, toY(boll.upper[idx]));
+      }
+    }
+    for (let i = n - 1; i >= 0; i--) {
+      const x = PAD_L + barW * i + barW / 2;
+      const idx = offset + i;
+      if (boll.lower[idx] != null) ctx.lineTo(x, toY(boll.lower[idx]));
+    }
+    ctx.fillStyle = '#4a90e2'; ctx.fill();
+    ctx.restore();
+  }
+
+  // MA lines
+  function drawMALine(maData, color) {
+    const offset = history.length - n;
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < n; i++) {
+      const idx = offset + i;
+      if (maData[idx] == null) continue;
+      const x = PAD_L + barW * i + barW / 2;
+      const y = toY(maData[idx]);
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  if (ma5) drawMALine(ma5, '#f59e0b');
+  if (ma20) drawMALine(ma20, '#4a90e2');
+
+  // Candlesticks + Volume
+  data.forEach((d, i) => {
+    const x = PAD_L + barW * i + barW / 2;
+    const isUp = d.close >= d.open;
+    const color = isUp ? '#ef4444' : '#22c55e';
+
+    // Candle body
+    const top = toY(Math.max(d.open, d.close));
+    const bot = toY(Math.min(d.open, d.close));
+    const bodyH = Math.max(bot - top, 1);
+    ctx.fillStyle = color;
+    ctx.fillRect(x - candleW / 2, top, candleW, bodyH);
+
+    // Wicks
+    ctx.strokeStyle = color; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, toY(d.high)); ctx.lineTo(x, toY(d.low)); ctx.stroke();
+
+    // Volume
+    const vH = (d.volume / vMax) * H_VOL;
+    ctx.fillStyle = isUp ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)';
+    ctx.fillRect(x - candleW / 2, volBase + H_VOL - vH, candleW, vH);
+  });
+
+  // Date labels
+  ctx.fillStyle = textColor; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+  for (let i = 0; i < n; i += Math.max(Math.floor(n / 5), 1)) {
+    const x = PAD_L + barW * i + barW / 2;
+    ctx.fillText(data[i].date.slice(5), x, H - 2);
+  }
+
+  // Legend
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = '#f59e0b'; ctx.fillText('— MA5', PAD_L + 30, PAD_T + 14);
+  ctx.fillStyle = '#4a90e2'; ctx.fillText('— MA20', PAD_L + 80, PAD_T + 14);
+}
+
+// ── Main Analysis ──
+async function analyze(code) {
+  code = code.replace(/\.TW$/i, '').trim();
+  const stock = STOCK_LIST.find(s => s.code === code);
+  const stockName = stock ? stock.name : code;
+
+  acList.classList.remove('show');
+  searchEl.value = `${code} ${stockName}`;
+  showLoading('正在取得 ' + stockName + ' 資料...');
+
+  try {
+    // 並行抓取
+    const [quote, history, chip] = await Promise.allSettled([
+      fetchTWSEQuote(code),
+      fetchYahooHistory(code, '6mo'),
+      fetchChipData(code),
+    ]);
+
+    const q = quote.status === 'fulfilled' ? quote.value : null;
+    const hist = history.status === 'fulfilled' ? history.value : [];
+    const chipData = chip.status === 'fulfilled' ? chip.value : null;
+
+    if (!hist.length) {
+      hideLoading();
+      document.getElementById('app').innerHTML = `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted)">⚠️ 無法取得 ${code} 的歷史數據，請確認股票代號是否正確</div>`;
+      return;
+    }
+
+    // Calculate technicals
+    const closes = hist.map(h => h.close);
+    const highs = hist.map(h => h.high);
+    const lows = hist.map(h => h.low);
+    const ma5 = calcMA(closes, 5);
+    const ma20 = calcMA(closes, 20);
+    const ma60 = calcMA(closes, 60);
+    const rsi = calcRSI(closes, 14);
+    const kd = calcKD(highs, lows, closes, 9);
+    const macd = calcMACD(closes);
+    const boll = calcBollinger(closes);
+
+    const last = closes.length - 1;
+    const price = q?.price || closes[last];
+    const prevClose = q?.yesterday || closes[last - 1];
+    const change = price - prevClose;
+    const changePct = (change / prevClose * 100);
+    const direction = change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
+
+    const score = calcScore(closes, highs, lows, rsi, kd, macd, boll);
+    const scoreColor = score >= 70 ? '#ef4444' : score >= 50 ? '#eab308' : '#22c55e';
+    const scoreLabel = score >= 70 ? '偏多' : score >= 50 ? '中性' : '偏空';
+
+    // RSI signal
+    const rsiVal = rsi[last];
+    const rsiSignal = rsiVal < 30 ? 'bullish' : rsiVal > 70 ? 'bearish' : 'neutral';
+    const rsiText = rsiVal < 30 ? '超賣區' : rsiVal > 70 ? '超買區' : rsiVal > 50 ? '偏強' : '偏弱';
+
+    // KD signal
+    const kdSignal = (kd.k[last] < 20) ? 'bullish' : (kd.k[last] > 80) ? 'bearish' : 'neutral';
+    const kdCross = (kd.k[last] > kd.d[last] && kd.k[last-1] <= kd.d[last-1]) ? ' 黃金交叉' :
+                    (kd.k[last] < kd.d[last] && kd.k[last-1] >= kd.d[last-1]) ? ' 死亡交叉' : '';
+
+    // MACD signal
+    const macdSignal = macd.dif[last] > macd.dea[last] ? 'bullish' : 'bearish';
+    const macdText = macd.dif[last] > macd.dea[last] ? '多頭排列' : '空頭排列';
+
+    // Bollinger signal
+    const bollSignal = closes[last] <= boll.lower[last] ? 'bullish' : closes[last] >= boll.upper[last] ? 'bearish' : 'neutral';
+    const bollText = closes[last] <= boll.lower[last] ? '觸及下軌' : closes[last] >= boll.upper[last] ? '觸及上軌' : '通道內';
+
+    // 20-day support/resistance
+    const recent20 = closes.slice(-20);
+    const support = Math.min(...lows.slice(-20));
+    const resistance = Math.max(...highs.slice(-20));
+
+    // Render
+    const app = document.getElementById('app');
+    app.innerHTML = `
+      <!-- Price Header -->
+      <div class="card">
+        <div class="price-header">
+          <div>
+            <span class="stock-name">${stockName}</span>
+            <span class="stock-code">${code}.TW</span>
+          </div>
+          <div>
+            <span class="stock-price ${direction}">${price.toFixed(2)}</span>
+            <span class="stock-change ${direction}">${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)</span>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-item"><div class="stat-label">開盤</div><div class="stat-value">${(q?.open || hist[last]?.open)?.toFixed(2) || '—'}</div></div>
+          <div class="stat-item"><div class="stat-label">最高</div><div class="stat-value" style="color:var(--red)">${(q?.high || hist[last]?.high)?.toFixed(2) || '—'}</div></div>
+          <div class="stat-item"><div class="stat-label">最低</div><div class="stat-value" style="color:var(--green)">${(q?.low || hist[last]?.low)?.toFixed(2) || '—'}</div></div>
+          <div class="stat-item"><div class="stat-label">成交量</div><div class="stat-value">${formatVolume(q?.volume || hist[last]?.volume)}</div></div>
+          <div class="stat-item"><div class="stat-label">20日支撐</div><div class="stat-value" style="color:var(--green)">${support.toFixed(2)}</div></div>
+          <div class="stat-item"><div class="stat-label">20日壓力</div><div class="stat-value" style="color:var(--red)">${resistance.toFixed(2)}</div></div>
+        </div>
+      </div>
+
+      <!-- Score -->
+      <div class="card">
+        <h2>📊 綜合評分</h2>
+        <div class="score-wrap">
+          <div class="score-circle" style="border-color:${scoreColor};color:${scoreColor}">
+            ${score}
+            <span style="font-size:12px;font-weight:400;color:var(--text-muted)">/ 100</span>
+          </div>
+          <div class="score-label" style="color:${scoreColor};font-weight:600;font-size:14px">${scoreLabel}</div>
+          <div class="score-label">綜合 RSI、KD、MACD、布林通道、均線排列</div>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="card">
+        <h2>📈 K 線走勢圖（60日）</h2>
+        <div class="chart-container">
+          <canvas id="kline-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Technical Indicators -->
+      <div class="card">
+        <h2>🔬 技術指標</h2>
+        <div class="tech-grid">
+          <div class="tech-card ${rsiSignal}">
+            <div class="tech-name">RSI (14)</div>
+            <div class="tech-value">${rsiVal?.toFixed(1) || '—'}</div>
+            <div class="tech-signal" style="color:${rsiSignal==='bullish'?'var(--red)':rsiSignal==='bearish'?'var(--green)':'var(--yellow)'}">${rsiText}</div>
+          </div>
+          <div class="tech-card ${kdSignal}">
+            <div class="tech-name">KD (9)</div>
+            <div class="tech-value">K: ${kd.k[last]?.toFixed(1) || '—'} / D: ${kd.d[last]?.toFixed(1) || '—'}</div>
+            <div class="tech-signal" style="color:${kdSignal==='bullish'?'var(--red)':kdSignal==='bearish'?'var(--green)':'var(--yellow)'}">${kd.k[last]?.toFixed(0)}${kdCross || (kd.k[last] > kd.d[last] ? ' K > D' : ' K < D')}</div>
+          </div>
+          <div class="tech-card ${macdSignal}">
+            <div class="tech-name">MACD</div>
+            <div class="tech-value">DIF: ${macd.dif[last]?.toFixed(2) || '—'}</div>
+            <div class="tech-signal" style="color:${macdSignal==='bullish'?'var(--red)':'var(--green)'}">${macdText} | 柱 ${macd.bar[last]?.toFixed(2)}</div>
+          </div>
+          <div class="tech-card ${bollSignal}">
+            <div class="tech-name">布林通道</div>
+            <div class="tech-value">${boll.middle[last]?.toFixed(2) || '—'}</div>
+            <div class="tech-signal" style="color:${bollSignal==='bullish'?'var(--red)':bollSignal==='bearish'?'var(--green)':'var(--yellow)'}">${bollText} | 帶寬 ${((boll.upper[last] - boll.lower[last]) / boll.middle[last] * 100).toFixed(1)}%</div>
+          </div>
+          <div class="tech-card ${ma5[last] > ma20[last] ? 'bullish' : 'bearish'}">
+            <div class="tech-name">均線</div>
+            <div class="tech-value">MA5: ${ma5[last]?.toFixed(2) || '—'}</div>
+            <div class="tech-signal" style="color:${ma5[last] > ma20[last] ? 'var(--red)' : 'var(--green)'}">MA20: ${ma20[last]?.toFixed(2)} | ${ma5[last] > ma20[last] ? '多頭排列' : '空頭排列'}</div>
+          </div>
+          <div class="tech-card neutral">
+            <div class="tech-name">乖離率 (MA5)</div>
+            <div class="tech-value">${((price - ma5[last]) / ma5[last] * 100).toFixed(2)}%</div>
+            <div class="tech-signal">${Math.abs((price - ma5[last]) / ma5[last] * 100) > 5 ? '⚠️ 乖離過大' : '正常範圍'}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chip Data -->
+      <div class="card">
+        <h2>💰 三大法人買賣超</h2>
+        ${chipData ? renderChipData(chipData) : '<div style="color:var(--text-muted);text-align:center;padding:16px">今日尚無籌碼數據（非交易日或盤中）</div>'}
+      </div>
+
+      <!-- AI Report -->
+      <div class="card">
+        <h2><span class="ai-dot"></span> AI 智慧診斷</h2>
+        <div class="ai-report">
+          <div id="ai-content" class="ai-placeholder">
+            <div style="font-size:28px;margin-bottom:12px">🤖</div>
+            <div>AI 模型連接中（MiniMAX 2.5）</div>
+            <div style="font-size:12px;margin-top:8px">API Key 設定後將自動啟用即時分析</div>
+            <button onclick="generateLocalReport('${code}','${stockName}',${score},${rsiVal?.toFixed(1)||50},${kd.k[last]?.toFixed(1)||50},'${macdText}','${bollText}',${changePct.toFixed(2)})" style="margin-top:14px;padding:8px 20px;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">
+              生成本地分析報告
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    hideLoading();
+
+    // Draw chart after DOM ready
+    requestAnimationFrame(() => {
+      drawKLineChart('kline-chart', hist, ma5, ma20, boll);
+    });
+
+  } catch (e) {
+    hideLoading();
+    document.getElementById('app').innerHTML = `<div class="card" style="text-align:center;padding:40px;color:var(--red)">❌ 分析失敗：${e.message}</div>`;
+  }
+}
+
+function renderChipData(chip) {
+  function bar(label, net) {
+    const isPos = net > 0;
+    const cls = isPos ? 'chip-buy' : 'chip-sell';
+    const maxVal = Math.max(Math.abs(chip.foreign_net), Math.abs(chip.trust_net), Math.abs(chip.dealer_net)) || 1;
+    const pct = Math.min(Math.abs(net) / maxVal * 80, 80) + 10;
+    const valStr = (net > 0 ? '+' : '') + (net / 1000).toFixed(0) + '張';
+    return `
+      <div class="chip-bar">
+        <div class="chip-label">${label}</div>
+        <div class="chip-track">
+          <div class="chip-fill ${cls}" style="width:${pct}%">${isPos ? '買' : '賣'}</div>
+        </div>
+        <div class="chip-value" style="color:${isPos ? 'var(--red)' : 'var(--green)'}">${valStr}</div>
+      </div>`;
+  }
+  const totalColor = chip.total_net > 0 ? 'var(--red)' : chip.total_net < 0 ? 'var(--green)' : 'var(--text-muted)';
+  return `
+    ${bar('外資', chip.foreign_net)}
+    ${bar('投信', chip.trust_net)}
+    ${bar('自營', chip.dealer_net)}
+    <div style="text-align:center;margin-top:8px;font-size:14px;font-weight:700;color:${totalColor}">
+      合計：${chip.total_net > 0 ? '+' : ''}${(chip.total_net / 1000).toFixed(0)} 張
+    </div>
+  `;
+}
+
+function formatVolume(v) {
+  if (!v) return '—';
+  if (v >= 100000000) return (v / 100000000).toFixed(1) + '億';
+  if (v >= 10000) return (v / 10000).toFixed(0) + '萬';
+  return v.toLocaleString();
+}
+
+function generateLocalReport(code, name, score, rsi, k, macdText, bollText, changePct) {
+  const el = document.getElementById('ai-content');
+  const direction = score >= 70 ? '偏多操作' : score >= 50 ? '中性觀望' : '偏空防守';
+  const rsiNote = rsi < 30 ? '已進入超賣區，留意反彈機會' : rsi > 70 ? '已進入超買區，留意拉回風險' : 'RSI 處於正常區間';
+  const kdNote = k < 20 ? 'KD 在低檔，有低接機會' : k > 80 ? 'KD 在高檔，注意回檔壓力' : 'KD 指標中性';
+
+  el.innerHTML = `<pre>📋 ${name}（${code}）本地分析報告
+━━━━━━━━━━━━━━━━━━━━━━
+綜合評分：${score}/100（${direction}）
+今日漲跌：${changePct >= 0 ? '+' : ''}${changePct}%
+
+【技術面觀察】
+• ${rsiNote}（RSI: ${rsi}）
+• ${kdNote}（K: ${k}）
+• MACD 呈${macdText}
+• 布林通道${bollText}
+
+【操作建議】
+${score >= 70 ? '• 技術面偏多，可逢回布局\n• 注意設定停損，勿過度追高' :
+  score >= 50 ? '• 多空不明，建議觀望為主\n• 等待明確方向訊號再進場' :
+  '• 技術面偏弱，建議減碼或觀望\n• 若持有可設定停損保護'}
+
+⚠️ 本報告由本地演算法生成，僅供參考
+💡 連接 MiniMAX 2.5 後將提供更深度的 AI 分析</pre>`;
+}
+
+function showLoading(text) {
+  document.getElementById('loading-text').textContent = text || '正在分析...';
+  document.getElementById('loading').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading').classList.remove('show');
+}
+</script>
+</body>
+</html>
