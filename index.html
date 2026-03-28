@@ -1081,6 +1081,12 @@ function showLoading(text) {
 function hideLoading() {
   document.getElementById('loading').classList.remove('show');
 }
+
+// URL hash support: #TICKER auto-analyzes on load
+(function(){
+  const h = location.hash.replace('#','').trim();
+  if(h) analyze(h);
+})();
 </script>
 </body>
 </html>
