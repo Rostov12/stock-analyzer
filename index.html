@@ -320,7 +320,8 @@ const STOCK_LIST = [
 // ── CORS Proxy 列表（多源備援）──
 const PROXIES = [
   url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  url => `https://thingproxy.freeboard.io/fetch/${url}`,
 ];
 let proxyIdx = 0;
 
@@ -328,12 +329,18 @@ async function corsGet(url) {
   for (let i = 0; i < PROXIES.length; i++) {
     const idx = (proxyIdx + i) % PROXIES.length;
     try {
-      const r = await fetch(PROXIES[idx](url), { signal: AbortSignal.timeout(8000) });
-      if (r.ok) { proxyIdx = idx; return r; }
+      const r = await fetch(PROXIES[idx](url), { signal: AbortSignal.timeout(10000) });
+      if (r.ok) {
+        const text = await r.text();
+        if (text && text.trim().length > 10) {
+          proxyIdx = idx;
+          return new Response(text, { status: 200, headers: r.headers });
+        }
+      }
     } catch {}
   }
-  // 最後嘗試直接請求
-  return fetch(url, { signal: AbortSignal.timeout(8000) });
+  // 最後嘗試直接請求（同源或無 CORS 限制時可用）
+  return fetch(url, { signal: AbortSignal.timeout(10000) });
 }
 
 // ── Theme ──
@@ -798,7 +805,7 @@ async function analyze(code) {
 
     if (!hist.length) {
       hideLoading();
-      document.getElementById('app').innerHTML = `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted)">⚠️ 無法取得 ${code} 的歷史數據，請確認股票代號是否正確</div>`;
+      document.getElementById('app').innerHTML = `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted)">⚠️ 無法取得 ${code} 的歷史數據<br><small style="color:var(--text-muted)">可能原因：CORS Proxy 暫時無法使用、股票代號錯誤、或休市期間資料延遲。<br>請稍後重試，或確認代號（如 2330、2454）。</small></div>`;
       return;
     }
 
