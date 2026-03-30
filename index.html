@@ -275,7 +275,7 @@ a { color: var(--primary); text-decoration: none; }
 
 <script>
 /* ══════════════════════════════════════════════════════
-   台股智慧分析工具 — 主程式
+   智慧分析工具 — 主程式
    ══════════════════════════════════════════════════════ */
 
 // ── 台股常用股票清單 ──
@@ -453,11 +453,16 @@ function isTWStock(code) {
 }
 
 function yahooSymbol(code) {
-  // TW stock → try .TW first; US stock / crypto → use as-is
+  // TW stock → try .TW first
   if (isTWStock(code)) return `${code}.TW`;
-  // Crypto symbols like BTC, ETH → append -USD
+  // Crypto symbols → append -USD
   if (/^(BTC|ETH|SOL|BNB|XRP|DOGE|ADA|AVAX|DOT|MATIC|LINK|UNI|SHIB)$/i.test(code)) return `${code.toUpperCase()}-USD`;
-  return code.toUpperCase();
+  // Major indices → add ^ prefix
+  const uc = code.toUpperCase();
+  if (/^(DJI|SPX|IXIC|GSPC|RUT|VIX|TNX|TYX|DXY|FTSE|N225|HSI|TWII|SOX)$/.test(uc)) return `^${uc}`;
+  // If code already has ^ prefix, keep it
+  if (uc.startsWith('^')) return uc;
+  return uc;
 }
 
 async function fetchYahooChart(sym, range) {
