@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>台股智慧分析工具</title>
+<title>智慧分析工具</title>
 <style>
 /* ── CSS Variables ── */
 :root {
@@ -229,7 +229,7 @@ a { color: var(--primary); text-decoration: none; }
 <div class="container">
   <!-- Header -->
   <div class="header">
-    <h1>📊 台股<span>智慧分析</span></h1>
+    <h1>📊 <span>智慧分析</span></h1>
     <div class="header-actions">
       <span id="market-status" class="market-status">休市</span>
       <button class="theme-btn" onclick="toggleTheme()" title="切換主題">🌓</button>
@@ -254,7 +254,7 @@ a { color: var(--primary); text-decoration: none; }
   <!-- Main Content -->
   <div id="app">
     <div class="welcome">
-      <h2>台股即時分析工具</h2>
+      <h2>即時分析工具（台股/美股/加密貨幣）</h2>
       <p>輸入股票代號或名稱，即時取得技術分析、籌碼面數據與 AI 診斷報告</p>
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px">資料來源：TWSE / Yahoo Finance | AI：Groq Llama 3.3</div>
       <div class="hot-stocks">
@@ -269,7 +269,7 @@ a { color: var(--primary); text-decoration: none; }
   </div>
 
   <div class="footer">
-    台股智慧分析工具 v1.0 | 資料僅供參考，不構成投資建議 | AI Model: Groq Llama 3.3 70B
+    智慧分析工具 v2.0 | 台股/美股/加密貨幣 | 資料僅供參考，不構成投資建議
   </div>
 </div>
 
@@ -447,45 +447,46 @@ async function fetchTWSEQuote(code) {
   return null;
 }
 
-async function fetchYahooHistory(code, range = '3mo') {
-  const sym = `${code}.TW`;
+function isTWStock(code) {
+  // TW stocks: purely numeric (2330, 00878, etc.)
+  return /^\d{3,6}$/.test(code);
+}
+
+function yahooSymbol(code) {
+  // TW stock → try .TW first; US stock / crypto → use as-is
+  if (isTWStock(code)) return `${code}.TW`;
+  // Crypto symbols like BTC, ETH → append -USD
+  if (/^(BTC|ETH|SOL|BNB|XRP|DOGE|ADA|AVAX|DOT|MATIC|LINK|UNI|SHIB)$/i.test(code)) return `${code.toUpperCase()}-USD`;
+  return code.toUpperCase();
+}
+
+async function fetchYahooChart(sym, range) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${range}&interval=1d`;
-  try {
-    const r = await corsGet(url);
-    const data = await r.json();
-    const result = data.chart?.result?.[0];
-    if (!result) throw new Error('no data');
-    const ts = result.timestamp || [];
-    const q = result.indicators?.quote?.[0] || {};
-    const rows = [];
-    for (let i = 0; i < ts.length; i++) {
-      if (q.close[i] == null) continue;
-      rows.push({
-        date: new Date(ts[i] * 1000).toISOString().slice(0, 10),
-        open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i],
-        volume: q.volume[i] || 0,
-      });
-    }
-    return rows;
-  } catch {
-    // 嘗試 .TWO (OTC)
-    try {
-      const sym2 = `${code}.TWO`;
-      const url2 = `https://query1.finance.yahoo.com/v8/finance/chart/${sym2}?range=${range}&interval=1d`;
-      const r = await corsGet(url2);
-      const data = await r.json();
-      const result = data.chart?.result?.[0];
-      if (!result) return [];
-      const ts = result.timestamp || [];
-      const q = result.indicators?.quote?.[0] || {};
-      const rows = [];
-      for (let i = 0; i < ts.length; i++) {
-        if (q.close[i] == null) continue;
-        rows.push({ date: new Date(ts[i]*1000).toISOString().slice(0,10), open:q.open[i], high:q.high[i], low:q.low[i], close:q.close[i], volume:q.volume[i]||0 });
-      }
-      return rows;
-    } catch { return []; }
+  const r = await corsGet(url);
+  const data = await r.json();
+  const result = data.chart?.result?.[0];
+  if (!result) return [];
+  const ts = result.timestamp || [];
+  const q = result.indicators?.quote?.[0] || {};
+  const rows = [];
+  for (let i = 0; i < ts.length; i++) {
+    if (q.close[i] == null) continue;
+    rows.push({ date: new Date(ts[i]*1000).toISOString().slice(0,10), open:q.open[i], high:q.high[i], low:q.low[i], close:q.close[i], volume:q.volume[i]||0 });
   }
+  return rows;
+}
+
+async function fetchYahooHistory(code, range = '3mo') {
+  const sym = yahooSymbol(code);
+  try {
+    const rows = await fetchYahooChart(sym, range);
+    if (rows.length) return rows;
+  } catch {}
+  // Fallback for TW stocks: try .TWO (OTC)
+  if (isTWStock(code)) {
+    try { return await fetchYahooChart(`${code}.TWO`, range); } catch {}
+  }
+  return [];
 }
 
 async function fetchChipData(code) {
@@ -805,7 +806,7 @@ async function analyze(code) {
 
     if (!hist.length) {
       hideLoading();
-      document.getElementById('app').innerHTML = `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted)">⚠️ 無法取得 ${code} 的歷史數據<br><small style="color:var(--text-muted)">可能原因：CORS Proxy 暫時無法使用、股票代號錯誤、或休市期間資料延遲。<br>請稍後重試，或確認代號（如 2330、2454）。</small></div>`;
+      document.getElementById('app').innerHTML = `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted)">⚠️ 無法取得 ${code} 的歷史數據<br><small style="color:var(--text-muted)">可能原因：CORS Proxy 暫時無法使用、代號錯誤、或休市期間資料延遲。<br>請稍後重試。支援台股（2330）、美股（AAPL, SMH）、加密貨幣（BTC）。</small></div>`;
       return;
     }
 
